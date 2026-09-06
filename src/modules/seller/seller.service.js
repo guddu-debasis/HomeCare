@@ -1,4 +1,5 @@
 import ApiError from "../../common/utils/api-error.js";
+import nodemailer from "nodemailer";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -6,9 +7,22 @@ import {
   verifyRefreshToken,
 } from "../../common/utils/jwt.utils.js";
 import Seller from "./seller.model.js";
+import crypto from "crypto";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
+
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: process.env.SMTP_PORT || 587,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS, // Use Google App Password if using Gmail
+  },
+});
+
 
 const register = async ({ name, email, password, role, dateOfBirth }) => {
   const existing = await Seller.findOne({ email });
@@ -92,9 +106,12 @@ const logout = async (userId) => {
   await Seller.findByIdAndUpdate(userId, { refreshToken: null });
 };
 
+
+
+
 const forgotPassword = async (email) => {
   const user = await Seller.findOne({ email });
-  if (!user) throw ApiError.notfound("No acccount with that email");
+  if (!user) throw ApiError.notFound("No account with that email");
 
   const { rawToken, hashedToken } = generateResetToken();
   user.resetPasswordToken = hashedToken;
@@ -102,7 +119,10 @@ const forgotPassword = async (email) => {
 
   await user.save();
 
-  //TODO: mail bhejna nhi aata
+  await sendResetPasswordEmail(user.email, rawToken);
 };
 
-export { register, login, refresh, logout, forgotPassword };
+
+
+
+export { register, login, refresh, logout, forgotPassword,sendResetPasswordEmail };

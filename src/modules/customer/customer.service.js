@@ -6,6 +6,7 @@ import {
   verifyRefreshToken,
 } from "../../common/utils/jwt.utils.js";
 import User from "./customer.model.js";
+import crypto from "crypto";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
