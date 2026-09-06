@@ -33,9 +33,9 @@ const userSchema = new mongoose.Schema({
         required: [true, "Date of Birth is required"]
     },
     verificationToken: {type: String, select: false},
-    refreshtoken: {type: String, select: false},
-    resetPasswordtoken: {type: String, select: false},
-    resetpasswordExpires: {type: Date, select: false},
+    refreshToken: {type: String, select: false},
+    resetPasswordToken: {type: String, select: false},
+    resetPasswordExpires: {type: Date, select: false},
 }, {timestamps: true})
 
 

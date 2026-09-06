@@ -1,58 +1,108 @@
-import ApiError from "../../common/utils/api-error.js"
-import { generateResetToken,generateAccessToken } from "../../common/utils/jwt.utils.js";
-import Admin from "./admin.model.js"
+import ApiError from "../../common/utils/api-error.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  generateResetToken,
+  verifyRefreshToken,
+} from "../../common/utils/jwt.utils.js";
+import Admin from "./admin.model.js";
 
-const register = async ({name, email, password, role, dateOfBirth})=> {
-    
-    const existing = await Admin.findOne({email})
-    if(existing) throw ApiError.conflict("Email already exisits");
+const hashToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
-    const {rawToken, hashedToken} = generateResetToken()
+const register = async ({ name, email, password, role, dateOfBirth }) => {
+  const existing = await Admin.findOne({ email });
+  if (existing) throw ApiError.conflict("Email already exisits");
 
-    const user = await Admin.create({
-        name,
-        email,
-        password,
-        role,
-        dateOfBirth,
-        verificationToken: hashedToken
-    })
+  const { rawToken, hashedToken } = generateResetToken();
 
-    // TODO: send an email to user with token: rawToken
+  const user = await Admin.create({
+    name,
+    email,
+    password,
+    role,
+    dateOfBirth,
+    verificationToken: hashedToken,
+  });
 
-    const userObj = user.toObject()
-    delete userObj.password
-    delete userObj.verificationToken
+  // TODO: send an email to user with token: rawToken
 
-    return userObj
-}
+  const userObj = user.toObject();
+  delete userObj.password;
+  delete userObj.verificationToken;
 
-const login = async ({email, password}) => {
-    // 1. Find user and explicitly select password if it's hidden by default in your schema
-    const admin = await Admin.findOne({ email });
-    if (!admin) throw ApiError.notFound("Admin not found");
+  return userObj;
+};
 
-    // 2. Verify password (added 'await' assuming bcrypt is used inside the method)
-    const isPasswordValid = await admin.verifyPassword(password);
-    if (!isPasswordValid) throw ApiError.unauthorized("Invalid credentials");
+const login = async ({ email, password }) => {
+  //take email and find user in DB
+  // then check if password is correct
+  // check if verified or not
 
-    // 3. Generate JWT access token
-    const token = generateAccessToken({ 
-        id: admin._id, 
-        role: admin.role 
-    });
+  const user = await Admin.findOne({ email }).select("+password"); //remember how to check email and password here thi is mongoose syntax
+  if (!user) throw ApiError.unauthorized("Invalid Email or password");
 
-    // 4. Clean up sensitive data before returning
-    const adminObj = admin.toObject();
-    delete adminObj.password;
-    delete adminObj.verificationToken;
+  // somehow I will check password
 
-    // 5. Return both the admin details and the token
-    return {
-        user: adminObj,
-        token
-    };
-}
+  if (!user.isVerified) {
+    throw ApiError.forbidden("Please verify your email before loggin");
+  }
 
+  const accessToken = generateAccessToken({ id: user._id, role: user.role });
+  const refreshToken = generateRefreshToken({ id: user._id });
 
-export {register,login}
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
+
+  const userObj = user.toObject();
+  delete userObj.password;
+  delete userObj.refreshToken;
+
+  return { user: userObj, accessToken, refreshToken };
+};
+
+// refresh token function make an anathor refresh token it uses when access token expires and we want to get a new access token using refresh token
+const refresh = async (token) => {
+  if (!token) throw ApiError.unauthorized("Refresh token missing");
+  const decoded = verifyRefreshToken(token);
+
+  const user = await Admin.findById(decoded.id).select("+refreshToken");
+  if (!user) throw ApiError.unauthorized("User not found");
+
+  if (user.refreshToken !== hashToken(token)) {
+    throw ApiError.unauthorized("Invalid refresh token");
+  }
+
+  const accessToken = generateAccessToken({ id: user._id, role: user.role });
+  const refreshToken = generateRefreshToken({ id: user._id });
+
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
+
+  return { accessToken, refreshToken };
+};
+
+const logout = async (userId) => {
+  //   const user = await User.findById(userId);
+  //   if (!user) throw ApiError.unauthorized("User not found");
+
+  //   user.refreshToken = undefined;
+  //   await user.save({ validateBeforeSave: false });
+
+  await Admin.findByIdAndUpdate(userId, { refreshToken: null });
+};
+
+const forgotPassword = async (email) => {
+  const user = await Admin.findOne({ email });
+  if (!user) throw ApiError.notfound("No acccount with that email");
+
+  const { rawToken, hashedToken } = generateResetToken();
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
+
+  await user.save();
+
+  //TODO: mail bhejna nhi aata
+};
+
+export { register, login, refresh, logout, forgotPassword };
