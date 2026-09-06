@@ -19,4 +19,33 @@ const loginAdmin = async (req, res, next) => {
     }
 };
 
-export { registerAdmin, loginAdmin };
+const refreshToken = async (req, res, next) => {
+    try {
+        const data = await adminService.refresh(req.body.token);
+        return ApiResponse.success(res, "Token refreshed successfully", data);
+    } catch (error) {
+        next(error);
+    }   
+};
+
+const logoutAdmin = async (req, res, next) => {
+    try {
+        await adminService.logout(req.user.id); // Assuming req.user is populated by auth middleware
+        return ApiResponse.success(res, "Admin logged out successfully");
+    }
+    catch (error) {
+        next(error);
+    }
+};
+
+const adminForgotPassword = async (req, res, next) => {
+    try {
+        await adminService.forgotPassword(req.body.email);
+        return ApiResponse.success(res, "Password reset email sent successfully");
+    } catch (error) {
+        next(error);
+    }
+};
+
+export { registerAdmin, loginAdmin, refreshToken, logoutAdmin, adminForgotPassword };   
+

@@ -19,4 +19,34 @@ const loginSeller = async (req, res, next) => {
     }
 };
 
-export { registerSeller, loginSeller };
+const forgotPassword = async (req, res, next) => {
+    try {
+        await sellerService.forgotPassword(req.body.email);
+        return ApiResponse.success(res, "Password reset email sent successfully");
+    }
+    catch (error) {
+        next(error);
+    }       
+};
+
+const refreshToken = async (req, res, next) => {
+    try {
+        const data = await sellerService.refresh(req.body.token);
+        return ApiResponse.success(res, "Token refreshed successfully", data);
+    }
+    catch (error) {
+        next(error);
+    }
+};
+
+const logoutSeller = async (req, res, next) => {
+    try {
+        await sellerService.logout(req.user.id); // Assuming req.user is populated by auth middleware
+        return ApiResponse.success(res, "Seller logged out successfully");
+    }
+    catch (error) {
+        next(error);
+    }
+};
+
+export { registerSeller, loginSeller, forgotPassword, refreshToken, logoutSeller };
