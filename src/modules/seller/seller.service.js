@@ -9,7 +9,7 @@ import {
 import Seller from "./seller.model.js";
 import crypto from "crypto";
 import { sendEmail } from "../../common/utils/email.utils.js";
-
+import bcrypt from "bcrypt";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -31,6 +31,7 @@ const register = async ({ name, email, password, role, dateOfBirth }) => {
   if (existing) throw ApiError.conflict("Email already exisits");
 
   const { rawToken, hashedToken } = generateResetToken();
+  password = await bcrypt.hash(password, 12); // Hash the password before saving
 
   const user = await Seller.create({
     name,
@@ -63,6 +64,9 @@ const login = async ({ email, password }) => {
   if (!user.isVerified) {
     throw ApiError.forbidden("Please verify your email before loggin");
   }
+
+  const isMatch= await user.comparePassword(password);
+  if (!isMatch) throw ApiError.unauthorized("Invalid Email or password");
 
   const accessToken = generateAccessToken({ id: user._id, role: user.role });
   const refreshToken = generateRefreshToken({ id: user._id });

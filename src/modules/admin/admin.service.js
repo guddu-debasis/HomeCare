@@ -18,7 +18,7 @@ const register = async ({ name, email, password, dateOfBirth }) => {
   if (existing) throw ApiError.conflict("Email already exisits");
 
   const { rawToken, hashedToken } = generateResetToken();
-  // Service
+  
   password = await bcrypt.hash(password, 12);
   const user = await Admin.create({
     name,
@@ -28,8 +28,6 @@ const register = async ({ name, email, password, dateOfBirth }) => {
     verificationToken: hashedToken,
   });
 
-  // TODO: send an email to user with token: rawToken
-
   const userObj = user.toObject();
   delete userObj.password;
   delete userObj.verificationToken;
@@ -38,11 +36,8 @@ const register = async ({ name, email, password, dateOfBirth }) => {
 };
 
 const login = async ({ email, password }) => {
-  //take email and find user in DB
-  // then check if password is correct
-  // check if verified or not
 
-  const user = await Admin.findOne({ email }).select("+password"); //remember how to check email and password here thi is mongoose syntax
+  const user = await Admin.findOne({ email }).select("+password"); 
   if (!user) throw ApiError.unauthorized("Invalid Email or password");
 
   const isPasswordCorrect = await user.comparePassword(password);
@@ -65,7 +60,7 @@ const login = async ({ email, password }) => {
   return { user: userObj, accessToken, refreshToken };
 };
 
-// refresh token function make an anathor refresh token it uses when access token expires and we want to get a new access token using refresh token
+
 const refresh = async (token) => {
   if (!token) throw ApiError.unauthorized("Refresh token missing");
   const decoded = verifyRefreshToken(token);
@@ -87,11 +82,7 @@ const refresh = async (token) => {
 };
 
 const logout = async (userId) => {
-  //   const user = await User.findById(userId);
-  //   if (!user) throw ApiError.unauthorized("User not found");
 
-  //   user.refreshToken = undefined;
-  //   await user.save({ validateBeforeSave: false });
 
   await Admin.findByIdAndUpdate(userId, { refreshToken: null });
 };

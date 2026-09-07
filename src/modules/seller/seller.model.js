@@ -38,5 +38,9 @@ const userSchema = new mongoose.Schema({
     resetPasswordExpires: {type: Date, select: false},
 }, {timestamps: true})
 
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
+    return isMatch;
+}
 
 export default mongoose.model("Seller", userSchema)

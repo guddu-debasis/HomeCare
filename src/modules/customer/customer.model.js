@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcrypt";
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -41,6 +42,12 @@ const userSchema = new mongoose.Schema({
     resetPasswordToken: {type: String, select: false},
     resetPasswordExpires: {type: Date, select: false},
 }, {timestamps: true})
+
+
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
+    return isMatch;
+}
 
 
 export default mongoose.model("User", userSchema)
