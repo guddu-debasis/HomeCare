@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
 
 const adminSchema = new mongoose.Schema({
     name: {
@@ -39,6 +40,10 @@ const adminSchema = new mongoose.Schema({
     refreshToken: {type: String, select: false},
     resetPasswordToken: {type: String, select: false},
     resetPasswordExpires: {type: Date, select: false},
-}, {timestamps: true})
+}, {timestamps: true});
+
+adminSchema.methods.comparePassword = async function (candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 export default mongoose.model("Admin", adminSchema)

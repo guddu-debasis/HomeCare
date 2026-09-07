@@ -8,21 +8,22 @@ import {
 import Admin from "./admin.model.js";
 import crypto from "crypto";
 import { sendEmail } from "../../common/utils/email.utils.js";
+import bcrypt from "bcrypt";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
 
-const register = async ({ name, email, password, role, dateOfBirth }) => {
+const register = async ({ name, email, password, dateOfBirth }) => {
   const existing = await Admin.findOne({ email });
   if (existing) throw ApiError.conflict("Email already exisits");
 
   const { rawToken, hashedToken } = generateResetToken();
-
+  // Service
+  password = await bcrypt.hash(password, 12);
   const user = await Admin.create({
     name,
     email,
     password,
-    role,
     dateOfBirth,
     verificationToken: hashedToken,
   });
@@ -44,11 +45,12 @@ const login = async ({ email, password }) => {
   const user = await Admin.findOne({ email }).select("+password"); //remember how to check email and password here thi is mongoose syntax
   if (!user) throw ApiError.unauthorized("Invalid Email or password");
 
-  // somehow I will check password
+  const isPasswordCorrect = await user.comparePassword(password);
 
-  if (!user.isVerified) {
-    throw ApiError.forbidden("Please verify your email before loggin");
+  if (!isPasswordCorrect) {
+  throw ApiError.unauthorized("Invalid email or password");
   }
+   
 
   const accessToken = generateAccessToken({ id: user._id, role: user.role });
   const refreshToken = generateRefreshToken({ id: user._id });

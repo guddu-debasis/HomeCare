@@ -1,4 +1,4 @@
-import ApiResponse from "../../common/utils/api.response.js";
+import ApiResponse from "../../common/utils/api-response.js";
 import * as adminService from "./admin.service.js"; // 👈 Importing all exports as a module namespace
 
 const registerAdmin = async (req, res, next) => {
@@ -47,5 +47,5 @@ const adminForgotPassword = async (req, res, next) => {
     }
 };
 
-export { registerAdmin, loginAdmin, refreshToken, logoutAdmin, adminForgotPassword };   
+export default { registerAdmin, loginAdmin, refreshToken, logoutAdmin, adminForgotPassword };   
 
