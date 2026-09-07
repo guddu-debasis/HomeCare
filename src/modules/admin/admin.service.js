@@ -6,6 +6,8 @@ import {
   verifyRefreshToken,
 } from "../../common/utils/jwt.utils.js";
 import Admin from "./admin.model.js";
+import crypto from "crypto";
+import { sendEmail } from "../../common/utils/email.utils.js";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -93,16 +95,73 @@ const logout = async (userId) => {
 };
 
 const forgotPassword = async (email) => {
-  const user = await Admin.findOne({ email });
-  if (!user) throw ApiError.notfound("No acccount with that email");
 
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw ApiError.notfound("No account with that email");
+  }
+
+
+  // 1. Generate token
   const { rawToken, hashedToken } = generateResetToken();
+
+
+  // 2. Save HASHED token in database
   user.resetPasswordToken = hashedToken;
-  user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
+
+
+  // 3. Token expires in 15 minutes
+  user.resetPasswordExpires =
+    new Date(Date.now() + 15 * 60 * 1000);
+
 
   await user.save();
 
-  //TODO: mail bhejna nhi aata
+
+  // 4. Create reset link
+  const resetUrl =
+    `${process.env.CLIENT_URL}/reset-password/${rawToken}`;
+
+
+  // 5. Send email
+  await sendEmail({
+    to: user.email,
+
+    subject: "Reset Your Password",
+
+    html: `
+      <h2>Password Reset Request</h2>
+
+      <p>Hello ${user.name || "User"},</p>
+
+      <p>
+        We received a request to reset your password.
+      </p>
+
+      <p>
+        Click the link below to reset your password:
+      </p>
+
+      <a href="${resetUrl}">
+        Reset Password
+      </a>
+
+      <p>
+        This link will expire in <strong>15 minutes</strong>.
+      </p>
+
+      <p>
+        If you did not request a password reset,
+        please ignore this email.
+      </p>
+    `,
+  });
+
+
+  return {
+    message: "Password reset link sent successfully",
+  };
 };
 
 export { register, login, refresh, logout, forgotPassword };
