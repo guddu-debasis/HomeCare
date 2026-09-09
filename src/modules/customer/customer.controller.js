@@ -1,4 +1,4 @@
-import ApiResponse from "../../common/utils/api.response.js";
+import ApiResponse from "../../common/utils/api-response.js";
 import * as customerService from "./customer.service.js"; // 👈 Importing all exports as a module namespace
 
 const registerCustomer = async (req, res, next) => {
@@ -48,4 +48,4 @@ const refreshToken = async (req, res, next) => {
     }   
 };   
 
-export { registerCustomer, loginCustomer, resetPassword, logoutCustomer, refreshToken };
+export default { registerCustomer, loginCustomer, resetPassword, logoutCustomer, refreshToken };

@@ -40,7 +40,7 @@ const login = async ({ email, password }) => {
   const user = await Admin.findOne({ email }).select("+password"); 
   if (!user) throw ApiError.unauthorized("Invalid Email or password");
 
-  const isPasswordCorrect = await user.comparePassword(password);
+  const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
   if (!isPasswordCorrect) {
   throw ApiError.unauthorized("Invalid email or password");

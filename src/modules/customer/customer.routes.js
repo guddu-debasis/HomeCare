@@ -2,10 +2,13 @@ import { Router } from "express";
 import validate from "../../common/middlewares/validate.middleware.js";
 import controller from "./customer.controller.js";
 import RegisterDto from "./dto/register.dto.js";
+import LoginDto from "./dto/login.dto.js";
 
 const router=Router();
 
-
+router.get("/",(req,res)=>{
+    res.send("Customer route is working");
+});
 router.post("/register", validate(RegisterDto), controller.registerCustomer);
 router.post("/login", validate(LoginDto), controller.loginCustomer);
 router.post("/logout", controller.logoutCustomer);

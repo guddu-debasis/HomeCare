@@ -1,4 +1,4 @@
-import ApiResponse from "../../common/utils/api.response.js";
+import ApiResponse from "../../common/utils/api-response.js";
 import * as sellerService from "./seller.service.js"; // 👈 Importing all exports as a module namespace
 
 const registerSeller = async (req, res, next) => {
