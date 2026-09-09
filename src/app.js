@@ -7,6 +7,7 @@ import customerRoutes from "./modules/customer/customer.routes.js"
 const app = express()
 
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
 app.use("/app/admin", adminRoutes)
 app.use("/app/seller", sellerRoutes)
