@@ -52,7 +52,7 @@ const login = async ({ email, password }) => {
     throw ApiError.forbidden("Please verify your email before loggin");
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
+  const isMatch = await user.comparePassword(password);
   if (!isMatch) throw ApiError.unauthorized("Invalid Email or password");
 
   const accessToken = generateAccessToken({ id: user._id, role: user.role });
