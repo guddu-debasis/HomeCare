@@ -1,0 +1,46 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-base: #eff3ee;
+  --color-surface: #fbfaf6;
+  --color-surface-raised: #ffffff;
+  --color-pine: #1f4b3f;
+  --color-pine-dark: #163529;
+  --color-pine-light: #e4ece8;
+  --color-ochre: #c98a2b;
+  --color-ochre-dark: #a66f1f;
+  --color-ochre-light: #f6e9d3;
+  --color-ink: #1b2620;
+  --color-ink-soft: #55625a;
+  --color-ink-faint: #869184;
+  --color-line: #dbe3d8;
+  --color-brick: #a3432f;
+  --color-brick-light: #f5e2dd;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+  html {
+    color-scheme: light;
+  }
+  body {
+    background-color: var(--color-base);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 2px;
+  }
+}
