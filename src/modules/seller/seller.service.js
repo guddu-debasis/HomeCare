@@ -50,7 +50,7 @@ const login = async ({ email, password }) => {
     throw ApiError.unauthorized("Invalid email or password");
   }
 
-  const accessToken = generateAccessToken({ id: user.id });
+  const accessToken = generateAccessToken({ id: user.id, role: "seller" });
   const refreshToken = generateRefreshToken({ id: user.id });
 
   const hashedRefreshToken = hashToken(refreshToken);
