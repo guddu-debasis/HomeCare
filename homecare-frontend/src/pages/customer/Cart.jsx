@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { cartApi, ordersApi } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
-import { card, input, label, btnAccent, errorText } from "../../lib/ui";
-import DeleteButton from "../../components/DeleteButton";
+import { useToast } from "../../context/ToastContext";
+import { btnPrimary, btnSecondary, input } from "../../lib/ui";
+import Footer from "../../components/Footer";
 
 export default function Cart() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bookingDate, setBookingDate] = useState("");
-  const [booking, setBooking] = useState(false);
+  const [timeSlot, setTimeSlot] = useState("Morning (08:00 - 12:00)");
+  const [ordering, setOrdering] = useState(false);
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
-  const load = () => {
+  const loadCart = () => {
     setLoading(true);
     cartApi
       .list()
@@ -22,92 +25,239 @@ export default function Cart() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    loadCart();
+    // Default booking date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setBookingDate(tomorrow.toISOString().split("T")[0]);
+  }, []);
 
-  const total = items.reduce(
-    (sum, i) => sum + Number(i.basePrice) * i.quantity,
-    0
-  );
-
-  const remove = async (cartId) => {
-    setError("");
+  const removeItem = async (id) => {
     try {
-      await cartApi.remove(cartId);
-      setItems((prev) => prev.filter((i) => i.cartId !== cartId));
+      await cartApi.remove(id);
+      showSuccess("Item removed from cart.");
+      setItems((prev) => prev.filter((i) => i.id !== id));
     } catch (err) {
-      setError(err.message);
+      showError(err.message || "Failed to remove item.");
     }
   };
 
-  const checkout = async (e) => {
+  const subtotal = items.reduce(
+    (acc, item) => acc + Number(item.price || item.basePrice || 0) * (item.quantity || 1),
+    0
+  );
+  const serviceFee = items.length > 0 ? 5.0 : 0;
+  const total = subtotal + serviceFee;
+
+  const handleCheckout = async (e) => {
     e.preventDefault();
-    setError("");
-    setBooking(true);
+    if (!bookingDate) {
+      showError("Please select a booking date.");
+      return;
+    }
+
+    setOrdering(true);
     try {
-      const order = await ordersApi.create(bookingDate);
-      navigate(`/orders/${order.data.id}`);
+      // Backend expects { bookingDate }
+      const res = await ordersApi.create(bookingDate);
+      showSuccess("Booking confirmed! Your order has been placed.");
+      navigate("/orders");
     } catch (err) {
-      setError(err.message);
+      showError(err.message || "Failed to place order.");
     } finally {
-      setBooking(false);
+      setOrdering(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="font-display text-3xl text-ink">Your cart</h1>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+      <div className="mx-auto max-w-7xl px-6 py-12 w-full space-y-8">
+        {/* Page Header */}
+        <div className="border-b border-slate-800 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase font-bold tracking-widest text-amber-400">Checkout</span>
+            <h1 className="font-display text-3xl font-bold text-white mt-1">Your Booking Cart</h1>
+          </div>
+          <Link to="/" className={btnSecondary}>
+            ← Browse More Services
+          </Link>
+        </div>
 
-      {loading && <p className="mt-6 text-sm text-ink-soft">Loading…</p>}
-      {error && <p className={`${errorText} mt-6`}>{error}</p>}
+        {loading && (
+          <div className="space-y-4">
+            <div className="h-24 rounded-2xl bg-slate-900/60 animate-pulse" />
+            <div className="h-24 rounded-2xl bg-slate-900/60 animate-pulse" />
+          </div>
+        )}
 
-      {!loading && items.length === 0 && !error && (
-        <p className="mt-6 text-sm text-ink-soft">
-          Your cart is empty. Look up a provider from the home page and add a
-          service to get started.
-        </p>
-      )}
+        {error && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-red-300">
+            {error}
+          </div>
+        )}
 
-      {items.length > 0 && (
-        <>
-          <ul className="mt-6 space-y-3">
-            {items.map((item) => (
-              <li key={item.cartId} className={`${card} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
-                <div className="min-w-0">
-                  <p className="break-words font-medium text-ink">{item.serviceName}</p>
-                  <p className="text-sm text-ink-soft">
-                    with {item.sellerName} · qty {item.quantity}
+        {!loading && !error && items.length === 0 && (
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-16 text-center space-y-4 max-w-2xl mx-auto">
+            <div className="text-5xl">🛒</div>
+            <h2 className="font-display text-2xl font-bold text-white">Your Cart is Empty</h2>
+            <p className="text-slate-400 text-sm max-w-md mx-auto">
+              You haven't added any home services to your cart yet. Explore our service catalog or look up your provider ID to start booking.
+            </p>
+            <div className="pt-4">
+              <Link to="/" className={btnPrimary}>
+                Explore Catalog →
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && items.length > 0 && (
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+            {/* Cart Items List */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="space-y-4">
+                {items.map((item) => {
+                  const itemPrice = Number(item.price || item.basePrice || 0);
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-700 transition-all"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-amber-400">
+                            Service #{item.serviceId}
+                          </span>
+                          {item.sellerId && (
+                            <Link
+                              to={`/sellers/${item.sellerId}`}
+                              className="rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-semibold text-slate-300 hover:text-white"
+                            >
+                              Provider #{item.sellerId}
+                            </Link>
+                          )}
+                        </div>
+                        <h3 className="font-display text-lg font-bold text-white">
+                          {item.serviceName || `Service #${item.serviceId}`}
+                        </h3>
+                        <p className="text-xs text-slate-400">Quantity: {item.quantity || 1}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                        <span className="text-lg font-extrabold text-amber-400">
+                          {formatMoney(itemPrice * (item.quantity || 1))}
+                        </span>
+
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
+                          title="Remove item"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Schedule Booking Card */}
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 backdrop-blur-xl space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 font-bold text-lg">
+                    📅
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold font-display text-white">Select Booking Schedule</h3>
+                    <p className="text-xs text-slate-400">Choose your preferred date and arrival time window</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Booking Date
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={bookingDate}
+                      onChange={(e) => setBookingDate(e.target.value)}
+                      className={input}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Time Slot Window
+                    </label>
+                    <select
+                      value={timeSlot}
+                      onChange={(e) => setTimeSlot(e.target.value)}
+                      className={input}
+                    >
+                      <option value="Morning (08:00 - 12:00)">Morning (08:00 - 12:00)</option>
+                      <option value="Afternoon (12:00 - 16:00)">Afternoon (12:00 - 16:00)</option>
+                      <option value="Evening (16:00 - 20:00)">Evening (16:00 - 20:00)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Order Summary Checkout Card */}
+            <div className="lg:col-span-5">
+              <div className="sticky top-24 rounded-3xl border border-slate-800 bg-slate-900/80 p-8 backdrop-blur-xl shadow-2xl space-y-6">
+                <h3 className="text-xl font-bold font-display text-white border-b border-slate-800 pb-4">
+                  Order Summary
+                </h3>
+
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Subtotal ({items.length} items)</span>
+                    <span className="font-semibold text-slate-200">{formatMoney(subtotal)}</span>
+                  </div>
+
+                  <div className="flex justify-between text-slate-400">
+                    <span>Service Fee & Protection</span>
+                    <span className="font-semibold text-slate-200">{formatMoney(serviceFee)}</span>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-800 flex justify-between items-baseline">
+                    <span className="text-base font-bold text-white">Total Amount</span>
+                    <span className="text-2xl font-extrabold text-amber-400">{formatMoney(total)}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-xs text-emerald-300 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Hearth Booking Protection Included
+                  </div>
+                  <p className="text-[11px] text-emerald-400/80">
+                    Free cancellations up to 24h before scheduled arrival. 100% money-back guarantee.
                   </p>
                 </div>
-                <div className="flex items-center justify-between gap-4 sm:justify-end">
-                  <span className="text-sm font-medium text-pine">
-                    {formatMoney(item.basePrice * item.quantity)}
-                  </span>
-                  <DeleteButton onClick={() => remove(item.cartId)} />
-                </div>
-              </li>
-            ))}
-          </ul>
 
-          <div className="mt-6 flex items-center justify-between border-t border-line pt-4">
-            <span className="text-sm text-ink-soft">Estimated total</span>
-            <span className="font-display text-xl text-ink">{formatMoney(total)}</span>
+                <button
+                  onClick={handleCheckout}
+                  disabled={ordering}
+                  className={`${btnPrimary} w-full py-3 text-base`}
+                >
+                  {ordering ? "Processing Booking..." : "Confirm & Place Order →"}
+                </button>
+              </div>
+            </div>
           </div>
+        )}
+      </div>
 
-          <form onSubmit={checkout} className={`${card} mt-6`}>
-            <label className={label}>Booking date</label>
-            <input
-              type="date"
-              required
-              className={input}
-              value={bookingDate}
-              onChange={(e) => setBookingDate(e.target.value)}
-            />
-            <button disabled={booking} className={`${btnAccent} mt-4 w-full`}>
-              {booking ? "Booking…" : "Confirm booking"}
-            </button>
-          </form>
-        </>
-      )}
+      <Footer />
     </div>
   );
 }

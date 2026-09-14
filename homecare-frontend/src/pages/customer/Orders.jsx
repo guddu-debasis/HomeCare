@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ordersApi } from "../../lib/api";
 import { formatMoney, formatDate } from "../../lib/format";
-import { card, errorText } from "../../lib/ui";
+import { btnSecondary } from "../../lib/ui";
 import StatusBadge from "../../components/StatusBadge";
+import Footer from "../../components/Footer";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
 
   useEffect(() => {
     ordersApi
@@ -18,36 +20,123 @@ export default function Orders() {
       .finally(() => setLoading(false));
   }, []);
 
+  const filteredOrders = orders.filter((o) => {
+    const s = (o.status || "pending").toLowerCase();
+    if (filter === "all") return true;
+    if (filter === "active") return s === "pending" || s === "confirmed" || s === "accepted";
+    if (filter === "completed") return s === "completed";
+    if (filter === "cancelled") return s === "cancelled";
+    return true;
+  });
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="font-display text-3xl text-ink">Your bookings</h1>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+      <div className="mx-auto max-w-5xl px-6 py-12 w-full space-y-8">
+        {/* Header */}
+        <div className="border-b border-slate-800 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase font-bold tracking-widest text-emerald-400">Customer Portal</span>
+            <h1 className="font-display text-3xl font-bold text-white mt-1">My Service Bookings</h1>
+          </div>
+          <Link to="/" className={btnSecondary}>
+            + Book New Service
+          </Link>
+        </div>
 
-      {loading && <p className="mt-6 text-sm text-ink-soft">Loading…</p>}
-      {error && <p className={`${errorText} mt-6`}>{error}</p>}
-
-      {!loading && orders.length === 0 && !error && (
-        <p className="mt-6 text-sm text-ink-soft">No bookings yet.</p>
-      )}
-
-      <ul className="mt-6 space-y-3">
-        {orders.map((o) => (
-          <li key={o.id}>
-            <Link
-              to={`/orders/${o.id}`}
-              className={`${card} flex flex-col gap-3 transition-colors hover:border-pine sm:flex-row sm:items-center sm:justify-between`}
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-4 overflow-x-auto">
+          {[
+            { id: "all", label: "All Bookings" },
+            { id: "active", label: "Active & Upcoming" },
+            { id: "completed", label: "Completed" },
+            { id: "cancelled", label: "Cancelled" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilter(tab.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                filter === tab.id
+                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
+                  : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-800"
+              }`}
             >
-              <div className="min-w-0">
-                <p className="font-medium text-ink">Booking #{o.id}</p>
-                <p className="text-sm text-ink-soft">{formatDate(o.bookingDate)}</p>
-              </div>
-              <div className="flex items-center justify-between gap-3 sm:justify-end">
-                <StatusBadge status={o.status} />
-                <span className="font-medium text-pine">{formatMoney(o.totalAmount)}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {loading && (
+          <div className="space-y-4">
+            <div className="h-28 rounded-2xl bg-slate-900/60 animate-pulse" />
+            <div className="h-28 rounded-2xl bg-slate-900/60 animate-pulse" />
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-red-300">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && filteredOrders.length === 0 && (
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-16 text-center space-y-4 max-w-xl mx-auto">
+            <div className="text-5xl">📋</div>
+            <h3 className="font-display text-xl font-bold text-white">No Bookings Found</h3>
+            <p className="text-slate-400 text-sm">
+              {filter === "all"
+                ? "You haven't placed any service bookings yet."
+                : `No bookings matched the "${filter}" filter.`}
+            </p>
+            <Link to="/" className={btnSecondary}>
+              Browse Services Catalog
+            </Link>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {filteredOrders.map((order) => (
+            <Link
+              key={order.id}
+              to={`/orders/${order.id}`}
+              className="group block rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md transition-all hover:border-amber-500/40 hover:bg-slate-900/90 shadow-xl"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="font-display text-lg font-bold text-white group-hover:text-amber-400 transition-colors">
+                      Booking #{order.id}
+                    </span>
+                    <StatusBadge status={order.status} />
+                  </div>
+
+                  <div className="flex items-center gap-4 text-xs text-slate-400">
+                    <span className="flex items-center gap-1">
+                      📅 Scheduled: <strong className="text-slate-200">{formatDate(order.bookingDate)}</strong>
+                    </span>
+                    <span>•</span>
+                    <span>{order.items?.length || 1} Item(s)</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between md:justify-end gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800">
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Cost</span>
+                    <span className="text-lg font-extrabold text-amber-400">
+                      {formatMoney(order.totalAmount)}
+                    </span>
+                  </div>
+
+                  <span className="rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                    Track Details →
+                  </span>
+                </div>
               </div>
             </Link>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      </div>
+
+      <Footer />
     </div>
   );
 }

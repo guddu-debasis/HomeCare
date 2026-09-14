@@ -1,20 +1,24 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { input, label, btnPrimary, errorText, card } from "../lib/ui";
+import { useToast } from "../context/ToastContext";
+import { input, btnPrimary } from "../lib/ui";
+import Footer from "../components/Footer";
 
 const ROLES = [
-  { key: "customer", title: "Customer" },
-  { key: "seller", title: "Provider" },
-  { key: "admin", title: "Admin" },
+  { key: "customer", title: "Customer", icon: "👤" },
+  { key: "seller", title: "Provider", icon: "🛠️" },
+  { key: "admin", title: "Admin", icon: "⚡" },
 ];
 
 export default function Login() {
   const [role, setRole] = useState("customer");
   const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const { login } = useAuth();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,82 +30,123 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    if (!form.email || !form.password) {
+      showError("Please fill in both email and password.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload =
-        role === "customer" ? { ...form, role: "customer" } : form;
+      const payload = role === "customer" ? { ...form, role: "customer" } : form;
       await login(role, payload);
+      showSuccess(`Welcome back! Signed in as ${role}.`);
       const dest = location.state?.from?.pathname || redirectFor(role);
       navigate(dest, { replace: true });
     } catch (err) {
-      setError(err.message);
+      showError(err.message || "Failed to log in.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-sm px-6 py-16">
-      <h1 className="font-display text-3xl text-ink">Welcome back</h1>
-      <p className="mt-1 text-sm text-ink-soft">
-        Log in to book care or manage your listings.
-      </p>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+      <div className="mx-auto max-w-md px-6 py-16 w-full my-auto space-y-8">
+        <div className="text-center space-y-2">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 font-extrabold text-2xl shadow-lg">
+            H
+          </div>
+          <h1 className="font-display text-3xl font-bold text-white">Welcome Back</h1>
+          <p className="text-sm text-slate-400">
+            Sign in to Hearth to manage your bookings or service offerings
+          </p>
+        </div>
 
-      <div className="mt-6 flex gap-1 rounded-md bg-pine-light p-1">
-        {ROLES.map((r) => (
-          <button
-            key={r.key}
-            type="button"
-            onClick={() => setRole(r.key)}
-            className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-              role === r.key
-                ? "bg-white text-pine shadow-sm"
-                : "text-pine-dark/70 hover:text-pine"
-            }`}
-          >
-            {r.title}
-          </button>
-        ))}
+        {/* Role Selector Tabs */}
+        <div className="flex rounded-2xl border border-slate-800 bg-slate-900/80 p-1.5 backdrop-blur-md">
+          {ROLES.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => setRole(r.key)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                role === r.key
+                  ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-bold"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>{r.icon}</span>
+              <span>{r.title}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Auth Form */}
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 backdrop-blur-xl shadow-2xl space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Email Address
+              </label>
+              <input
+                type="email"
+                required
+                placeholder="name@example.com"
+                className={input}
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => alert("Password reset emails are handled automatically on request.")}
+                  className="text-[11px] font-semibold text-amber-400 hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  placeholder="••••••••"
+                  className={`${input} pr-10`}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" disabled={loading} className={`${btnPrimary} w-full py-3 text-base`}>
+              {loading ? "Signing in..." : `Sign In as ${role.toUpperCase()}`}
+            </button>
+          </form>
+
+          <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400">
+            Don't have a Hearth account yet?{" "}
+            <Link to="/register" className="font-bold text-amber-400 hover:underline">
+              Create an account →
+            </Link>
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className={`${card} mt-4 space-y-4`}>
-        {error && <p className={errorText}>{error}</p>}
-
-        <div>
-          <label className={label}>Email</label>
-          <input
-            type="email"
-            required
-            className={input}
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label className={label}>Password</label>
-          <input
-            type="password"
-            required
-            minLength={8}
-            className={input}
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
-        </div>
-
-        <button disabled={loading} className={`${btnPrimary} w-full`}>
-          {loading ? "Logging in…" : "Log in"}
-        </button>
-      </form>
-
-      <p className="mt-4 text-center text-sm text-ink-soft">
-        New here?{" "}
-        <Link to="/register" className="font-medium text-pine hover:underline">
-          Create an account
-        </Link>
-      </p>
+      <Footer />
     </div>
   );
 }
