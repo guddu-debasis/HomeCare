@@ -9,6 +9,7 @@ import orderRoutes from "./modules/order/order.routes.js"
 import serviceRoutes from "./modules/service/service.routes.js";
 import sellerServiceRoutes from "./modules/seller-service/seller-service.routes.js";
 import ratingsRoutes from "./modules/ratings/ratings.routes.js";
+import errorHandler from "./common/middlewares/error.middleware.js";
 
 const app = express()
 
@@ -24,5 +25,8 @@ app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/services", serviceRoutes);
 app.use("/api/v1/seller-services", sellerServiceRoutes);
 app.use("/api/v1/ratings", ratingsRoutes);
+
+// Must be registered last — catches every next(error) from the routes above
+app.use(errorHandler);
 
 export default app

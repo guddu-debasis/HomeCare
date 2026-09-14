@@ -77,7 +77,7 @@ const refresh = async (token) => {
     throw ApiError.unauthorized("Invalid refresh token");
   }
 
-  const accessToken = generateAccessToken({ id: user.id });
+  const accessToken = generateAccessToken({ id: user.id, role: "customer" });
   const refreshToken = generateRefreshToken({ id: user.id });
 
   const hashedRefreshToken = hashToken(refreshToken);
@@ -102,7 +102,7 @@ const forgotPassword = async (email) => {
   const [user] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
 
   if (!user) {
-    throw ApiError.notfound("No account with that email");
+    throw ApiError.notFound("No account with that email");
   }
 
   const { rawToken, hashedToken } = generateResetToken();

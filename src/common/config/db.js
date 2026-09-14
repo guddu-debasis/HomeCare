@@ -10,17 +10,19 @@ const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// Without this, an error on an idle pooled connection (e.g. the DB dropping
+// it) becomes an unhandled 'error' event and can crash the process outside
+// of any request/response cycle.
+pool.on("error", (err) => {
+  console.error("Unexpected error on idle Postgres client:", err);
+});
+
 export const db = drizzle(pool);
 
 const connectDB = async () => {
-  try {
-    const client = await pool.connect();
-    console.log(`PostgreSQL Connected: ${client.connectionParameters.database}`);
-    client.release();
-  } catch (err) {
-    console.error("Database connection error details:", err);
-    process.exit(1);
-  }
+  const client = await pool.connect();
+  console.log(`PostgreSQL Connected: ${client.connectionParameters.database}`);
+  client.release();
 };
 
 export default connectDB;

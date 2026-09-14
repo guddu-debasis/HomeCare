@@ -3,7 +3,7 @@ import {
   addServiceToSeller, 
   fetchSellerServices, 
   removeServiceFromSeller 
-} from "./sellerservice.controller.js";
+} from "./seller-service.controller.js";
 import { verifyAuth, verifySeller } from "../../common/middlewares/auth.middleware.js";
 import validate from "../../common/middlewares/validate.middleware.js";
 import CreateSellerServiceDto from "./dto/create-seller-service.dto.js";

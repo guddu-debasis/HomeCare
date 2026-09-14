@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cartApi, ordersApi } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
-import { card, input, label, btnAccent, btnDanger, errorText } from "../../lib/ui";
+import { card, input, label, btnAccent, errorText } from "../../lib/ui";
+import DeleteButton from "../../components/DeleteButton";
 
 export default function Cart() {
   const [items, setItems] = useState([]);
@@ -70,20 +71,18 @@ export default function Cart() {
         <>
           <ul className="mt-6 space-y-3">
             {items.map((item) => (
-              <li key={item.cartId} className={`${card} flex items-center justify-between`}>
-                <div>
-                  <p className="font-medium text-ink">{item.serviceName}</p>
+              <li key={item.cartId} className={`${card} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-ink">{item.serviceName}</p>
                   <p className="text-sm text-ink-soft">
                     with {item.sellerName} · qty {item.quantity}
                   </p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between gap-4 sm:justify-end">
                   <span className="text-sm font-medium text-pine">
                     {formatMoney(item.basePrice * item.quantity)}
                   </span>
-                  <button onClick={() => remove(item.cartId)} className={btnDanger}>
-                    Remove
-                  </button>
+                  <DeleteButton onClick={() => remove(item.cartId)} />
                 </div>
               </li>
             ))}

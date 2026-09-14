@@ -10,7 +10,7 @@ const ROLES = [
 ];
 
 const initialForms = {
-  customer: { name: "", email: "", password: "", dateOfBirth: "" },
+  customer: { username: "", email: "", password: "", dob: "" },
   seller: { username: "", email: "", password: "", dob: "", phNo: "" },
   admin: { username: "", email: "", password: "", dob: "", phNo: "" },
 };
@@ -33,9 +33,7 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const payload =
-        role === "customer" ? { ...form, role: "customer" } : form;
-      await register(role, payload);
+      await register(role, form);
       setSuccess(true);
     } catch (err) {
       setError(err.message);
@@ -90,14 +88,15 @@ export default function Register() {
 
         {role === "customer" ? (
           <div>
-            <label className={label}>Full name</label>
+            <label className={label}>Username</label>
             <input
               required
+              minLength={3}
               pattern="[a-zA-Z0-9]+"
               title="Letters and numbers only, no spaces"
               className={input}
-              value={form.name}
-              onChange={(e) => setField("name", e.target.value)}
+              value={form.username}
+              onChange={(e) => setField("username", e.target.value)}
             />
             <p className="mt-1 text-xs text-ink-faint">
               Letters and numbers only, no spaces.
@@ -147,8 +146,8 @@ export default function Register() {
               type="date"
               required
               className={input}
-              value={form.dateOfBirth}
-              onChange={(e) => setField("dateOfBirth", e.target.value)}
+              value={form.dob}
+              onChange={(e) => setField("dob", e.target.value)}
             />
           </div>
         ) : (

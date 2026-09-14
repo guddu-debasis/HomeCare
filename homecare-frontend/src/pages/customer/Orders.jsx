@@ -34,13 +34,13 @@ export default function Orders() {
           <li key={o.id}>
             <Link
               to={`/orders/${o.id}`}
-              className={`${card} flex items-center justify-between transition-colors hover:border-pine`}
+              className={`${card} flex flex-col gap-3 transition-colors hover:border-pine sm:flex-row sm:items-center sm:justify-between`}
             >
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-ink">Booking #{o.id}</p>
                 <p className="text-sm text-ink-soft">{formatDate(o.bookingDate)}</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3 sm:justify-end">
                 <StatusBadge status={o.status} />
                 <span className="font-medium text-pine">{formatMoney(o.totalAmount)}</span>
               </div>

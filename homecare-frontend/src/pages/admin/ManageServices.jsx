@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { servicesApi } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
-import { card, input, label, btnAccent, btnDanger, errorText } from "../../lib/ui";
+import { card, input, label, btnAccent, errorText } from "../../lib/ui";
+import DeleteButton from "../../components/DeleteButton";
 
 export default function ManageServices() {
   const [services, setServices] = useState([]);
@@ -67,17 +68,15 @@ export default function ManageServices() {
               <p className="text-sm text-ink-soft">No services yet — add the first one below.</p>
             )}
             {services.map((s) => (
-              <li key={s.id} className={`${card} flex items-center justify-between`}>
-                <div>
-                  <p className="font-medium text-ink">{s.serviceName}</p>
+              <li key={s.id} className={`${card} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-ink">{s.serviceName}</p>
                   {s.description && (
-                    <p className="text-sm text-ink-soft">{s.description}</p>
+                    <p className="break-words text-sm text-ink-soft">{s.description}</p>
                   )}
                   <p className="text-sm text-pine">{formatMoney(s.basePrice)}</p>
                 </div>
-                <button onClick={() => removeService(s.id)} className={btnDanger}>
-                  Remove
-                </button>
+                <DeleteButton onClick={() => removeService(s.id)} />
               </li>
             ))}
           </ul>

@@ -1,4 +1,4 @@
-import * as sellerServiceService from "./sellerservice.service.js";
+import * as sellerServiceService from "./seller-service.service.js";
 import ApiResponse from "../../common/utils/api-response.js";
 
 const addServiceToSeller = async (req, res, next) => {

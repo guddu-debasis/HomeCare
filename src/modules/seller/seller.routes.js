@@ -3,6 +3,7 @@ import validate from "../../common/middlewares/validate.middleware.js";
 import * as controller from "./seller.controller.js";
 import RegisterDto from "./dto/register.dto.js";
 import LoginDto from "./dto/login.dto.js";
+import { verifyAuth, verifySeller } from "../../common/middlewares/auth.middleware.js";
 
 const router = Router();
 
@@ -11,7 +12,7 @@ router.get("/",(req,res)=>{
 });
 router.post("/register", validate(RegisterDto), controller.registerSeller);
 router.post("/login", validate(LoginDto), controller.loginSeller);
-router.post("/logout", controller.logoutSeller);
+router.post("/logout", verifyAuth, verifySeller, controller.logoutSeller);
 router.post("/refresh-token", controller.refreshToken);
 router.post("/forgot-password", controller.forgotPassword);
 

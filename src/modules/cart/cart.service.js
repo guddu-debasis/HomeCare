@@ -63,7 +63,7 @@ const removeFromCart = async (cartItemId, customerId) => {
     .limit(1);
 
   if (!item) {
-    throw ApiError.notfound("Cart item not found");
+    throw ApiError.notFound("Cart item not found");
   }
 
   await db.delete(cartItems).where(eq(cartItems.id, cartItemId));

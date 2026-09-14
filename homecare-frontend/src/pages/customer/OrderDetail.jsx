@@ -90,12 +90,12 @@ export default function OrderDetail() {
 
       {order && (
         <>
-          <div className={`${card} mt-6 flex items-center justify-between`}>
+          <div className={`${card} mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
             <div>
               <p className="text-sm text-ink-soft">Booking date</p>
               <p className="font-medium text-ink">{formatDate(order.bookingDate)}</p>
             </div>
-            <div className="text-right">
+            <div className="sm:text-right">
               <StatusBadge status={order.status} />
               <p className="mt-1 text-xs text-ink-faint">
                 Payment: <StatusBadge status={order.paymentStatus} />
@@ -107,8 +107,8 @@ export default function OrderDetail() {
           <ul className="mt-4 space-y-3">
             {(order.items || []).map((item) => (
               <li key={item.id} className={card}>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-ink">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="break-words text-sm text-ink">
                     Service #{item.serviceId} · Provider #{item.sellerId} · qty {item.quantity}
                   </p>
                   <span className="font-medium text-pine">

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { sellerServicesApi, servicesApi } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
-import { card, input, label, btnAccent, btnDanger, errorText } from "../../lib/ui";
+import { card, input, label, btnAccent, errorText } from "../../lib/ui";
+import DeleteButton from "../../components/DeleteButton";
 
 export default function MyServices() {
   const { user } = useAuth();
@@ -85,11 +86,11 @@ export default function MyServices() {
               </p>
             )}
             {offerings.map((o) => (
-              <li key={o.id} className={`${card} flex items-center justify-between`}>
-                <div>
-                  <p className="font-medium text-ink">{o.serviceName}</p>
+              <li key={o.id} className={`${card} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-ink">{o.serviceName}</p>
                   {o.description && (
-                    <p className="text-sm text-ink-soft">{o.description}</p>
+                    <p className="break-words text-sm text-ink-soft">{o.description}</p>
                   )}
                   <p className="text-sm text-pine">
                     {formatMoney(o.customPrice ?? o.basePrice)}
@@ -100,9 +101,7 @@ export default function MyServices() {
                     )}
                   </p>
                 </div>
-                <button onClick={() => removeOffering(o.serviceId)} className={btnDanger}>
-                  Remove
-                </button>
+                <DeleteButton onClick={() => removeOffering(o.serviceId)} />
               </li>
             ))}
           </ul>
