@@ -5,33 +5,36 @@ import {
   generateResetToken,
   verifyRefreshToken,
 } from "../../common/utils/jwt.utils.js";
-import User from "./customer.model.js";
 import crypto from "crypto";
 import { sendEmail } from "../../common/utils/email.utils.js";
 import bcrypt from "bcrypt";
+import { customers } from "../../db/schema.js";
+import { db } from "../../common/config/db.js";
+import { eq } from "drizzle-orm";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
 
-const register = async ({ name, email, password, role, dateOfBirth }) => {
-  const existing = await User.findOne({ email });
-  if (existing) throw ApiError.conflict("Email already exisits");
+const register = async ({ username, email, password, dob, phNo }) => {
+  const [existing] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
+  if (existing) throw ApiError.conflict("Email already exists");
 
-  const { rawToken, hashedToken } = generateResetToken();
-  password = await bcrypt.hash(password, 12);
+  const { hashedToken } = generateResetToken();
+  const hashedPassword = await bcrypt.hash(password, 12);
 
-  const user = await User.create({
-    name,
-    email,
-    password,
-    role,
-    dateOfBirth,
-    verificationToken: hashedToken,
-  });
+  const [newUser] = await db
+    .insert(customers)
+    .values({
+      username,
+      email,
+      password: hashedPassword,
+      dob: dob || null,
+      phNo: phNo || null,
+      verificationToken: hashedToken,
+    })
+    .returning();
 
-  // TODO: send an email to user with token: rawToken
-
-  const userObj = user.toObject();
+  const userObj = { ...newUser };
   delete userObj.password;
   delete userObj.verificationToken;
 
@@ -39,130 +42,106 @@ const register = async ({ name, email, password, role, dateOfBirth }) => {
 };
 
 const login = async ({ email, password }) => {
-  //take email and find user in DB
-  // then check if password is correct
-  // check if verified or not
-
-  const user = await User.findOne({ email }).select("+password"); //remember how to check email and password here thi is mongoose syntax
+  const [user] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
   if (!user) throw ApiError.unauthorized("Invalid Email or password");
 
-  // somehow I will check password
-
-  if (!user.isVerified) {
-    throw ApiError.forbidden("Please verify your email before loggin");
+  const isPasswordCorrect = await bcrypt.compare(password, user.password);
+  if (!isPasswordCorrect) {
+    throw ApiError.unauthorized("Invalid email or password");
   }
 
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) throw ApiError.unauthorized("Invalid Email or password");
+  const accessToken = generateAccessToken({ id: user.id });
+  const refreshToken = generateRefreshToken({ id: user.id });
 
-  const accessToken = generateAccessToken({ id: user._id, role: user.role });
-  const refreshToken = generateRefreshToken({ id: user._id });
+  const hashedRefreshToken = hashToken(refreshToken);
+  await db
+    .update(customers)
+    .set({ refreshToken: hashedRefreshToken })
+    .where(eq(customers.id, user.id));
 
-  user.refreshToken = hashToken(refreshToken);
-  await user.save({ validateBeforeSave: false });
-
-  const userObj = user.toObject();
+  const userObj = { ...user };
   delete userObj.password;
   delete userObj.refreshToken;
 
   return { user: userObj, accessToken, refreshToken };
 };
 
-// refresh token function make an anathor refresh token it uses when access token expires and we want to get a new access token using refresh token
 const refresh = async (token) => {
   if (!token) throw ApiError.unauthorized("Refresh token missing");
   const decoded = verifyRefreshToken(token);
 
-  const user = await User.findById(decoded.id).select("+refreshToken");
+  const [user] = await db.select().from(customers).where(eq(customers.id, decoded.id)).limit(1);
   if (!user) throw ApiError.unauthorized("User not found");
 
   if (user.refreshToken !== hashToken(token)) {
     throw ApiError.unauthorized("Invalid refresh token");
   }
 
-  const accessToken = generateAccessToken({ id: user._id, role: user.role });
-  const refreshToken = generateRefreshToken({ id: user._id });
+  const accessToken = generateAccessToken({ id: user.id });
+  const refreshToken = generateRefreshToken({ id: user.id });
 
-  user.refreshToken = hashToken(refreshToken);
-  await user.save({ validateBeforeSave: false });
+  const hashedRefreshToken = hashToken(refreshToken);
+  await db
+    .update(customers)
+    .set({ refreshToken: hashedRefreshToken })
+    .where(eq(customers.id, user.id));
 
   return { accessToken, refreshToken };
 };
 
 const logout = async (userId) => {
-  //   const user = await User.findById(userId);
-  //   if (!user) throw ApiError.unauthorized("User not found");
-
-  //   user.refreshToken = undefined;
-  //   await user.save({ validateBeforeSave: false });
-
-  await User.findByIdAndUpdate(userId, { refreshToken: null });
+  await db
+    .update(customers)
+    .set({ refreshToken: null })
+    .where(eq(customers.id, userId));
+    
+  return { message: "Logged out successfully" };
 };
 
 const forgotPassword = async (email) => {
-
-  const user = await User.findOne({ email });
+  const [user] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
 
   if (!user) {
     throw ApiError.notfound("No account with that email");
   }
 
-
-  // 1. Generate token
   const { rawToken, hashedToken } = generateResetToken();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
+  await db
+    .update(customers)
+    .set({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: expiresAt,
+    })
+    .where(eq(customers.id, user.id));
 
-  // 2. Save HASHED token in database
-  user.resetPasswordToken = hashedToken;
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${rawToken}`;
 
-
-  // 3. Token expires in 15 minutes
-  user.resetPasswordExpires =
-    new Date(Date.now() + 15 * 60 * 1000);
-
-
-  await user.save();
-
-
-  // 4. Create reset link
-  const resetUrl =
-    `${process.env.CLIENT_URL}/reset-password/${rawToken}`;
-
-
-  // 5. Send email
   await sendEmail({
     to: user.email,
-
     subject: "Reset Your Password",
-
     html: `
       <h2>Password Reset Request</h2>
-
-      <p>Hello ${user.name || "User"},</p>
-
+      <p>Hello ${user.username || "User"},</p>
       <p>
         We received a request to reset your password.
       </p>
-
       <p>
         Click the link below to reset your password:
       </p>
-
       <a href="${resetUrl}">
         Reset Password
       </a>
-
       <p>
         This link will expire in <strong>15 minutes</strong>.
       </p>
-
       <p>
         If you did not request a password reset,
         please ignore this email.
       </p>
     `,
   });
-
 
   return {
     message: "Password reset link sent successfully",

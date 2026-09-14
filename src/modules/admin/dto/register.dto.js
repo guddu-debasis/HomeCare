@@ -2,13 +2,10 @@ import Joi from "joi";
 import BaseDto from "../../../common/dto/base.dto.js";
 
 class RegisterDto extends BaseDto {
-
   static schema = Joi.object({
-
-    name: Joi.string()
-      .alphanum()
+    username: Joi.string()
       .min(3)
-      .max(30)
+      .max(50)
       .required(),
 
     email: Joi.string()
@@ -21,12 +18,14 @@ class RegisterDto extends BaseDto {
       .message("Password must contain 8 chars minimum")
       .required(),
 
-    dateOfBirth: Joi.date()
+    dob: Joi.date()
       .iso()
-      .required(),
+      .optional(),
 
+    phNo: Joi.string()
+      .pattern(/^[0-9+-\s()]*$/)
+      .optional(),
   });
-
 }
 
 export default RegisterDto;
