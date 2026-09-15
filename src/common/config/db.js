@@ -8,6 +8,14 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: true }
+    : { rejectUnauthorized: false },
+});
+
+// Supabase pooler may use a different search_path — force public on every connection
+pool.on('connect', (client) => {
+  client.query('SET search_path TO public');
 });
 
 // Without this, an error on an idle pooled connection (e.g. the DB dropping
