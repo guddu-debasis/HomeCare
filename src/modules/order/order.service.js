@@ -1,9 +1,17 @@
 import { db } from "../../common/config/db.js";
 import { orderBooking, orderItems, cartItems, service, sellerService, notifications, customers } from "../../db/schema.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import ApiError from "../../common/utils/api-error.js";
 
 const createOrder = async ({ customerId, bookingDate }) => {
+  // Joi.date().iso() coerces the incoming string into a JS Date object.
+  // Normalize it back to a plain YYYY-MM-DD string so DB inserts and
+  // notification messages don't show a full timezone-aware datetime string.
+  const bookingDateStr =
+    bookingDate instanceof Date
+      ? bookingDate.toISOString().split("T")[0]
+      : String(bookingDate).split("T")[0];
+
   // 1. Fetch items from the customer's cart with prices
   const itemsInCart = await db
     .select({
@@ -54,7 +62,7 @@ const createOrder = async ({ customerId, bookingDate }) => {
         totalAmount: totalAmount.toFixed(2),
         paymentStatus: "pending",
         status: "pending",
-        bookingDate,
+        bookingDate: bookingDateStr,
       })
       .returning();
 
@@ -78,7 +86,7 @@ const createOrder = async ({ customerId, bookingDate }) => {
       await tx.insert(notifications).values({
         sellerId: item.sellerId,
         title: `New Booking Order #${booking.id}`,
-        message: `New booking for "${item.serviceName}" (Qty: ${item.quantity}) from ${cust?.username || "Customer"} scheduled on ${bookingDate}.`,
+        message: `New booking for "${item.serviceName}" (Qty: ${item.quantity}) from ${cust?.username || "Customer"} scheduled on ${bookingDateStr}.`,
         type: "order",
         link: "/seller/services",
         isRead: false,
@@ -98,7 +106,8 @@ const getCustomerOrders = async (customerId) => {
   return await db
     .select()
     .from(orderBooking)
-    .where(eq(orderBooking.customerId, customerId));
+    .where(eq(orderBooking.customerId, customerId))
+    .orderBy(desc(orderBooking.createdAt));
 };
 
 const getOrderById = async (orderId, customerId) => {

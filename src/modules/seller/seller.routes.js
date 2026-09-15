@@ -19,7 +19,9 @@ router.post("/reset-password", controller.resetPassword);
 router.get("/bookings", verifyAuth, verifySeller, controller.fetchSellerBookings);
 router.patch("/bookings/:id/status", verifyAuth, verifySeller, controller.updateSellerBookingStatus);
 router.get("/notifications", verifyAuth, verifySeller, controller.fetchSellerNotifications);
-router.patch("/notifications/:id/read", verifyAuth, verifySeller, controller.markSellerNotificationRead);
+// IMPORTANT: static segment "read-all" must be registered BEFORE the parameterized
+// "/:id/read" route, otherwise Express treats "read-all" as the value of :id.
 router.patch("/notifications/read-all", verifyAuth, verifySeller, controller.markAllSellerNotificationsRead);
+router.patch("/notifications/:id/read", verifyAuth, verifySeller, controller.markSellerNotificationRead);
 
 export default router;

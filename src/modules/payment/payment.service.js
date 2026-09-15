@@ -18,6 +18,15 @@ const createRazorpayOrder = async (orderId, customerId) => {
 
   const amountInPaise = Math.round(Number(order.totalAmount) * 100);
 
+  // Razorpay enforces a minimum of 100 paise (₹1.00) for INR orders.
+  // Return a clear error rather than letting Razorpay reject the request.
+  if (amountInPaise < 100) {
+    throw ApiError.badRequest(
+      `Order total ₹${Number(order.totalAmount).toFixed(2)} is below the minimum payable amount of ₹1.00. ` +
+      `Please add services with a higher price to proceed with payment.`
+    );
+  }
+
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
     currency: "INR",
@@ -63,6 +72,17 @@ const verifyPayment = async (
     throw ApiError.badRequest("Missing payment verification details");
   }
 
+  // Validate that the received signature is a properly-formed hex string before
+  // creating a Buffer from it. Buffer.from(str, 'hex') silently truncates on
+  // invalid input, which could cause a length mismatch rather than a clean error.
+  if (!/^[0-9a-fA-F]+$/.test(razorpaySignature)) {
+    await db
+      .update(orderBooking)
+      .set({ paymentStatus: "failed" })
+      .where(eq(orderBooking.id, order.id));
+    throw ApiError.badRequest("Payment verification failed");
+  }
+
   const expectedSignature = crypto
     .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
     .update(`${razorpayOrderId}|${razorpayPaymentId}`)
@@ -102,6 +122,11 @@ const verifyPayment = async (
 const processWebhookEvent = async (rawBody, signature) => {
   if (!signature) {
     throw ApiError.badRequest("Missing webhook signature");
+  }
+
+  // Validate the webhook signature is valid hex before creating Buffers.
+  if (!/^[0-9a-fA-F]+$/.test(signature)) {
+    throw ApiError.badRequest("Invalid webhook signature");
   }
 
   const expectedSignature = crypto

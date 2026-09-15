@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { sellerServicesApi, ratingsApi, cartApi } from "../lib/api";
+import { sellerServicesApi, ratingsApi, cartApi, ordersApi } from "../lib/api";
 import { formatMoney, formatDate } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -20,8 +20,16 @@ export default function SellerProfile() {
   const [error, setError] = useState("");
   const [addingId, setAddingId] = useState(null);
 
+  // Bookings the logged-in customer has with THIS seller that are eligible
+  // for a review (completed, not already rated). A rating must reference a
+  // real booking (see ratings.dto.js / ratings.service.js on the backend),
+  // so we need one of these before the review form can be submitted.
+  const [reviewableBookings, setReviewableBookings] = useState([]);
+  const [loadingReviewable, setLoadingReviewable] = useState(false);
+
   // Review Modal State
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState("");
   const [ratingScore, setRatingScore] = useState(5);
   const [comment, setComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -44,6 +52,49 @@ export default function SellerProfile() {
   useEffect(() => {
     loadData();
   }, [sellerId]);
+
+  // Figure out which of the customer's own bookings with this seller are
+  // completed and not yet reviewed, so the review form has a real booking to
+  // attach the rating to instead of silently failing validation.
+  useEffect(() => {
+    if (role !== "customer" || !isAuthenticated) {
+      setReviewableBookings([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingReviewable(true);
+    ordersApi
+      .list()
+      .then(async (res) => {
+        const orders = (res.data || []).filter(
+          (o) => (o.status || "").toLowerCase() === "completed"
+        );
+        // Need each order's items to know which seller(s) were booked.
+        const detailed = await Promise.all(
+          orders.map((o) => ordersApi.get(o.id).then((r) => r.data).catch(() => null))
+        );
+        if (cancelled) return;
+
+        const eligible = [];
+        for (const order of detailed) {
+          if (!order) continue;
+          const hasSeller = (order.items || []).some(
+            (item) => String(item.sellerId) === String(sellerId)
+          );
+          if (hasSeller) {
+            eligible.push({ id: order.id, bookingDate: order.bookingDate });
+          }
+        }
+        setReviewableBookings(eligible);
+      })
+      .catch(() => setReviewableBookings([]))
+      .finally(() => !cancelled && setLoadingReviewable(false));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [role, isAuthenticated, sellerId]);
 
   const avgRating = ratings.length
     ? ratings.reduce((sum, r) => sum + Number(r.ratingScore || 0), 0) / ratings.length
@@ -77,6 +128,10 @@ export default function SellerProfile() {
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
+    if (!selectedBookingId) {
+      showError("Please select which booking you're reviewing.");
+      return;
+    }
     if (!comment.trim()) {
       showError("Please enter a comment for your review.");
       return;
@@ -85,6 +140,7 @@ export default function SellerProfile() {
     setSubmittingReview(true);
     try {
       await ratingsApi.add({
+        bookingId: Number(selectedBookingId),
         sellerId: Number(sellerId),
         ratingScore,
         comment: comment.trim(),
@@ -93,6 +149,8 @@ export default function SellerProfile() {
       setIsReviewModalOpen(false);
       setComment("");
       setRatingScore(5);
+      setSelectedBookingId("");
+      setReviewableBookings((prev) => prev.filter((b) => String(b.id) !== String(selectedBookingId)));
       loadData(); // Refresh reviews
     } catch (err) {
       showError(err.message || "Failed to submit review.");
@@ -150,10 +208,18 @@ export default function SellerProfile() {
                   Copy Provider ID
                 </button>
 
-                {role === "customer" && (
+                {role === "customer" && reviewableBookings.length > 0 && (
                   <button onClick={() => setIsReviewModalOpen(true)} className={btnPrimary}>
                     ★ Leave a Review
                   </button>
+                )}
+                {role === "customer" && !loadingReviewable && reviewableBookings.length === 0 && (
+                  <span
+                    className="text-xs text-slate-500 max-w-[220px]"
+                    title="You can review a provider once you have a completed booking with them."
+                  >
+                    Complete a booking with this provider to leave a review.
+                  </span>
                 )}
               </div>
             </div>
@@ -258,7 +324,7 @@ export default function SellerProfile() {
                     <p className="text-sm text-slate-400">Verified feedback and ratings from previous bookings</p>
                   </div>
 
-                  {role === "customer" && (
+                  {role === "customer" && reviewableBookings.length > 0 && (
                     <button onClick={() => setIsReviewModalOpen(true)} className={btnSecondary}>
                       + Write Review
                     </button>
@@ -268,7 +334,7 @@ export default function SellerProfile() {
                 {ratings.length === 0 ? (
                   <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-3">
                     <p className="text-slate-400">No customer reviews yet for this provider.</p>
-                    {role === "customer" && (
+                    {role === "customer" && reviewableBookings.length > 0 && (
                       <button onClick={() => setIsReviewModalOpen(true)} className={btnPrimary}>
                         Be the first to review
                       </button>
@@ -316,6 +382,27 @@ export default function SellerProfile() {
       >
         <form onSubmit={handleReviewSubmit} className="space-y-4">
           <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Which Booking Are You Reviewing?
+            </label>
+            <select
+              required
+              value={selectedBookingId}
+              onChange={(e) => setSelectedBookingId(e.target.value)}
+              className={input}
+            >
+              <option value="" disabled>
+                Select a completed booking...
+              </option>
+              {reviewableBookings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  Booking #{b.id} — {formatDate(b.bookingDate)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">
               Your Rating Score
             </label>
@@ -347,7 +434,7 @@ export default function SellerProfile() {
             >
               Cancel
             </button>
-            <button type="submit" disabled={submittingReview} className={btnPrimary}>
+            <button type="submit" disabled={submittingReview || !selectedBookingId} className={btnPrimary}>
               {submittingReview ? "Submitting..." : "Submit Review"}
             </button>
           </div>

@@ -45,7 +45,7 @@ const resetPassword = async (req, res, next) => {
 
 const refreshToken = async (req, res, next) => {
     try {
-        const data = await sellerService.refresh(req.body.token);
+        const data = await sellerService.refresh(req.body.refreshToken);
         return ApiResponse.success(res, "Token refreshed successfully", data);
     }
     catch (error) {

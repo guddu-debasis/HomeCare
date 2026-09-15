@@ -122,7 +122,9 @@ export default function Navbar() {
 
           <div className="ml-4 flex items-center gap-3 border-l border-slate-800 pl-4">
             <ThemeToggle />
-            {isAuthenticated && role === "seller" && <NotificationBell />}
+            {isAuthenticated && (role === "seller" || role === "customer") && (
+              <NotificationBell role={role} />
+            )}
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5">
@@ -171,7 +173,9 @@ export default function Navbar() {
         {/* Mobile controls */}
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
-          {isAuthenticated && role === "seller" && <NotificationBell />}
+          {isAuthenticated && (role === "seller" || role === "customer") && (
+            <NotificationBell role={role} />
+          )}
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}

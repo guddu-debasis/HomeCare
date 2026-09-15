@@ -212,4 +212,11 @@ export const sellerNotificationsApi = {
   markAllRead: () => client.patch("/app/v1/seller/notifications/read-all"),
 };
 
+// ---------- Customer Notifications ----------
+export const customerNotificationsApi = {
+  list: () => client.get("/app/v1/customer/notifications"),
+  markRead: (id) => client.patch(`/app/v1/customer/notifications/${id}/read`),
+  markAllRead: () => client.patch("/app/v1/customer/notifications/read-all"),
+};
+
 export default client;

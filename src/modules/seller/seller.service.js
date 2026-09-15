@@ -183,8 +183,12 @@ const updateBookingStatus = async (sellerId, bookingId, status) => {
 
   // Verify that this booking contains an item belonging to this seller
   const [item] = await db
-    .select()
+    .select({
+      serviceId: orderItems.serviceId,
+      serviceName: service.serviceName,
+    })
     .from(orderItems)
+    .innerJoin(service, eq(orderItems.serviceId, service.id))
     .where(and(eq(orderItems.orderId, numericBookingId), eq(orderItems.sellerId, numericSellerId)))
     .limit(1);
 
@@ -200,6 +204,24 @@ const updateBookingStatus = async (sellerId, bookingId, status) => {
     })
     .where(eq(orderBooking.id, numericBookingId))
     .returning();
+
+  // Let the customer know their booking status changed.
+  if (updated?.customerId) {
+    const statusMessages = {
+      accepted: `Your booking for "${item.serviceName}" has been accepted by the seller.`,
+      completed: `Your booking for "${item.serviceName}" has been marked as completed.`,
+      cancelled: `Your booking for "${item.serviceName}" has been cancelled by the seller.`,
+    };
+
+    await db.insert(notifications).values({
+      customerId: updated.customerId,
+      title: `Booking #${numericBookingId} ${status}`,
+      message: statusMessages[status] || `Your booking for "${item.serviceName}" status was updated to ${status}.`,
+      type: "booking_status",
+      link: `/orders/${numericBookingId}`,
+      isRead: false,
+    });
+  }
 
   return updated;
 };

@@ -47,8 +47,9 @@ export default function Cart() {
     (acc, item) => acc + Number(item.price || item.basePrice || 0) * (item.quantity || 1),
     0
   );
-  const serviceFee = items.length > 0 ? 5.0 : 0;
-  const total = subtotal + serviceFee;
+  // NOTE: The backend computes its own total from cart prices with no service fee.
+  // Keep UI total = backend total so the Razorpay charge matches what's displayed.
+  const total = subtotal;
 
   const handleCheckout = async (e) => {
     e.preventDefault();
@@ -296,11 +297,6 @@ export default function Cart() {
                   <div className="flex justify-between text-slate-400">
                     <span>Subtotal ({items.length} items)</span>
                     <span className="font-semibold text-slate-200">{formatMoney(subtotal)}</span>
-                  </div>
-
-                  <div className="flex justify-between text-slate-400">
-                    <span>Service Fee & Protection</span>
-                    <span className="font-semibold text-slate-200">{formatMoney(serviceFee)}</span>
                   </div>
 
                   <div className="pt-3 border-t border-slate-800 flex justify-between items-baseline">

@@ -117,7 +117,8 @@ export const ratings = pgTable('Ratings', {
 // Notifications Table
 export const notifications = pgTable('Notifications', {
   id: serial('id').primaryKey(),
-  sellerId: integer('seller_id').notNull().references(() => seller.id, { onDelete: 'cascade' }),
+  sellerId: integer('seller_id').references(() => seller.id, { onDelete: 'cascade' }),
+  customerId: integer('customer_id').references(() => customers.id, { onDelete: 'cascade' }),
   title: varchar('title', { length: 255 }).notNull(),
   message: varchar('message', { length: 1000 }).notNull(),
   type: varchar('type', { length: 50 }).notNull().default('order'),

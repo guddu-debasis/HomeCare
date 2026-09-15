@@ -61,4 +61,45 @@ const refreshToken = async (req, res, next) => {
     }   
 };   
 
-export default { registerCustomer, loginCustomer, forgotPassword, resetPassword, logoutCustomer, refreshToken };
+const fetchCustomerNotifications = async (req, res, next) => {
+    try {
+        const customerId = req.user.id;
+        const notifications = await customerService.getCustomerNotifications(customerId);
+        return ApiResponse.success(res, "Customer notifications retrieved successfully", notifications);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const markCustomerNotificationRead = async (req, res, next) => {
+    try {
+        const customerId = req.user.id;
+        const notificationId = Number(req.params.id);
+        const updated = await customerService.markNotificationRead(customerId, notificationId);
+        return ApiResponse.success(res, "Notification marked as read", updated);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const markAllCustomerNotificationsRead = async (req, res, next) => {
+    try {
+        const customerId = req.user.id;
+        const result = await customerService.markAllNotificationsRead(customerId);
+        return ApiResponse.success(res, "All notifications marked as read", result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default {
+    registerCustomer,
+    loginCustomer,
+    forgotPassword,
+    resetPassword,
+    logoutCustomer,
+    refreshToken,
+    fetchCustomerNotifications,
+    markCustomerNotificationRead,
+    markAllCustomerNotificationsRead,
+};

@@ -18,6 +18,5 @@ router.post("/", validate(CreateOrderDto), createNewOrder);
 router.get("/", fetchCustomerOrders);
 router.get("/:id", fetchOrderDetails);
 router.patch("/:id/cancel", cancelOrderRequest);
-router.post("/:id/cancel", cancelOrderRequest);
 
 export default router;

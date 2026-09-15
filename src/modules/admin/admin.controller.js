@@ -21,7 +21,7 @@ const loginAdmin = async (req, res, next) => {
 
 const refreshToken = async (req, res, next) => {
     try {
-        const data = await adminService.refresh(req.body.token);
+        const data = await adminService.refresh(req.body.refreshToken);
         return ApiResponse.success(res, "Token refreshed successfully", data);
     } catch (error) {
         next(error);

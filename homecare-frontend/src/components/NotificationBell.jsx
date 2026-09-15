@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { sellerNotificationsApi } from "../lib/api";
+import { sellerNotificationsApi, customerNotificationsApi } from "../lib/api";
 
 function formatRelativeTime(dateString) {
   if (!dateString) return "";
@@ -18,7 +18,10 @@ function formatRelativeTime(dateString) {
   return date.toLocaleDateString();
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ role = "seller" }) {
+  const notificationsApi = role === "customer" ? customerNotificationsApi : sellerNotificationsApi;
+  const defaultLink = role === "customer" ? "/orders" : "/seller/services";
+  const defaultLinkLabel = role === "customer" ? "View My Bookings →" : "View Service Offerings & Orders →";
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,12 +30,12 @@ export default function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await sellerNotificationsApi.list();
+      const res = await notificationsApi.list();
       if (res && res.data) {
         setNotifications(res.data);
       }
     } catch (err) {
-      console.error("Failed to fetch seller notifications:", err);
+      console.error(`Failed to fetch ${role} notifications:`, err);
     }
   };
 
@@ -41,7 +44,8 @@ export default function NotificationBell() {
     // Poll every 20 seconds for real-time incoming orders & messages
     const interval = setInterval(fetchNotifications, 20000);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -63,7 +67,7 @@ export default function NotificationBell() {
   const handleMarkAllRead = async () => {
     setLoading(true);
     try {
-      await sellerNotificationsApi.markAllRead();
+      await notificationsApi.markAllRead();
       setNotifications((prev) =>
         prev.map((item) => ({ ...item, isRead: true }))
       );
@@ -77,7 +81,7 @@ export default function NotificationBell() {
   const handleNotificationClick = async (notif) => {
     if (!notif.isRead) {
       try {
-        await sellerNotificationsApi.markRead(notif.id);
+        await notificationsApi.markRead(notif.id);
         setNotifications((prev) =>
           prev.map((item) =>
             item.id === notif.id ? { ...item, isRead: true } : item
@@ -130,8 +134,8 @@ export default function NotificationBell() {
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700/60 dark:border-slate-800 bg-slate-800/40 dark:bg-slate-900 text-slate-300 hover:text-white hover:border-amber-500/40 hover:bg-slate-800 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-        title="Seller Notifications"
-        aria-label="Seller Notifications"
+        title={role === "customer" ? "Notifications" : "Seller Notifications"}
+        aria-label={role === "customer" ? "Notifications" : "Seller Notifications"}
       >
         <svg
           className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "scale-110" : ""}`}
@@ -191,7 +195,9 @@ export default function NotificationBell() {
                 </div>
                 <p className="text-sm font-medium text-slate-300">No notifications yet</p>
                 <p className="text-xs text-slate-500 mt-1">
-                  When customers book your services or send messages, they will appear here.
+                  {role === "customer"
+                    ? "When sellers update your bookings, updates will appear here."
+                    : "When customers book your services or send messages, they will appear here."}
                 </p>
               </div>
             ) : (
@@ -237,11 +243,11 @@ export default function NotificationBell() {
                 type="button"
                 onClick={() => {
                   setIsOpen(false);
-                  navigate("/seller/services");
+                  navigate(defaultLink);
                 }}
                 className="text-xs font-medium text-slate-400 hover:text-amber-400 transition-colors"
               >
-                View Service Offerings & Orders →
+                {defaultLinkLabel}
               </button>
             </div>
           )}

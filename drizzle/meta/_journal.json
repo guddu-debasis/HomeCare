@@ -8,6 +8,13 @@
       "when": 1789465421139,
       "tag": "0000_abnormal_ogun",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789486709855,
+      "tag": "0001_add_notifications_customer_id",
+      "breakpoints": true
     }
   ]
 }

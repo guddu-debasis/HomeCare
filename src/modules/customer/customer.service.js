@@ -8,9 +8,9 @@ import {
 import crypto from "crypto";
 import { sendEmail } from "../../common/utils/email.utils.js";
 import bcrypt from "bcrypt";
-import { customers } from "../../db/schema.js";
+import { customers, notifications } from "../../db/schema.js";
 import { db } from "../../common/config/db.js";
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -183,4 +183,49 @@ const resetPassword = async (token, newPassword) => {
   return { message: "Password reset successfully. You can now log in with your new password." };
 };
 
-export { register, login, refresh, logout, forgotPassword, resetPassword };
+const getCustomerNotifications = async (customerId) => {
+  return await db
+    .select()
+    .from(notifications)
+    .where(eq(notifications.customerId, Number(customerId)))
+    .orderBy(desc(notifications.createdAt));
+};
+
+const markNotificationRead = async (customerId, notificationId) => {
+  const [updated] = await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(notifications.id, Number(notificationId)),
+        eq(notifications.customerId, Number(customerId))
+      )
+    )
+    .returning();
+
+  if (!updated) {
+    throw ApiError.notFound("Notification not found");
+  }
+  return updated;
+};
+
+const markAllNotificationsRead = async (customerId) => {
+  await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.customerId, Number(customerId)));
+
+  return { message: "All notifications marked as read" };
+};
+
+export {
+  register,
+  login,
+  refresh,
+  logout,
+  forgotPassword,
+  resetPassword,
+  getCustomerNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+};

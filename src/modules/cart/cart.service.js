@@ -1,5 +1,5 @@
 import { db } from "../../common/config/db.js";
-import { cartItems, service, seller } from "../../db/schema.js";
+import { cartItems, service, seller, sellerService } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import ApiError from "../../common/utils/api-error.js";
 
@@ -39,20 +39,37 @@ const addToCart = async ({ customerId, serviceId, sellerId, quantity = 1 }) => {
 };
 
 const getCartItems = async (customerId) => {
-  return await db
+  const rows = await db
     .select({
-      cartId: cartItems.id,
+      id: cartItems.id,
       quantity: cartItems.quantity,
       serviceId: service.id,
       serviceName: service.serviceName,
       basePrice: service.basePrice,
+      customPrice: sellerService.customPrice,
       sellerId: seller.id,
       sellerName: seller.username,
     })
     .from(cartItems)
     .innerJoin(service, eq(cartItems.serviceId, service.id))
     .innerJoin(seller, eq(cartItems.sellerId, seller.id))
+    .leftJoin(
+      sellerService,
+      and(
+        eq(sellerService.sellerId, cartItems.sellerId),
+        eq(sellerService.serviceId, cartItems.serviceId)
+      )
+    )
     .where(eq(cartItems.customerId, customerId));
+
+  // Surface the effective per-unit price (seller's custom rate if they've set
+  // one, otherwise the catalog base price) as `price`, matching what
+  // order.service.js actually charges at checkout so the cart total the
+  // customer sees isn't misleading.
+  return rows.map((row) => ({
+    ...row,
+    price: row.customPrice ?? row.basePrice,
+  }));
 };
 
 const removeFromCart = async (cartItemId, customerId) => {
