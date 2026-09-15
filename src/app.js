@@ -14,7 +14,20 @@ import paymentRoutes from "./modules/payment/payment.routes.js";
 
 const app = express()
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // allow requests with no origin (curl, mobile apps, Render health checks)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true
+}));
+
 // Stash the raw request bytes alongside the parsed body. The Razorpay webhook
 // signature is computed over the exact raw payload Razorpay sent — re-serializing
 // req.body with JSON.stringify is not guaranteed to match byte-for-byte (key
