@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ordersApi } from "../../lib/api";
 import { formatMoney, formatDate } from "../../lib/format";
-import { btnSecondary } from "../../lib/ui";
+import { btnSecondary, btnDanger } from "../../lib/ui";
+import { useToast } from "../../context/ToastContext";
 import StatusBadge from "../../components/StatusBadge";
 import Footer from "../../components/Footer";
 
@@ -11,6 +12,9 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
+  const [cancellingId, setCancellingId] = useState(null);
+  const [confirmCancelId, setConfirmCancelId] = useState(null);
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     ordersApi
@@ -19,6 +23,24 @@ export default function Orders() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleCancel = async (e, orderId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCancellingId(orderId);
+    try {
+      await ordersApi.cancel(orderId);
+      showSuccess(`Booking #${orderId} has been cancelled successfully.`);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" } : o))
+      );
+      setConfirmCancelId(null);
+    } catch (err) {
+      showError(err.message || "Failed to cancel booking.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const filteredOrders = orders.filter((o) => {
     const s = (o.status || "pending").toLowerCase();
@@ -118,13 +140,61 @@ export default function Orders() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between md:justify-end gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800">
+                <div className="flex flex-wrap items-center justify-between md:justify-end gap-4 sm:gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800">
                   <div className="text-right">
                     <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Cost</span>
                     <span className="text-lg font-extrabold text-amber-400">
                       {formatMoney(order.totalAmount)}
                     </span>
                   </div>
+
+                  {(order.status || "").toLowerCase() === "pending" && (
+                    <div
+                      className="flex items-center gap-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                    >
+                      {confirmCancelId === order.id ? (
+                        <div className="flex items-center gap-1.5 rounded-xl border border-red-500/40 bg-red-950/80 px-2.5 py-1">
+                          <span className="text-xs font-semibold text-red-300">Cancel?</span>
+                          <button
+                            type="button"
+                            disabled={cancellingId === order.id}
+                            onClick={(e) => handleCancel(e, order.id)}
+                            className="rounded-lg bg-red-600 px-2 py-0.5 text-xs font-bold text-white hover:bg-red-500 disabled:opacity-50"
+                          >
+                            {cancellingId === order.id ? "..." : "Yes"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={cancellingId === order.id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setConfirmCancelId(null);
+                            }}
+                            className="rounded-lg bg-slate-800 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-700"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setConfirmCancelId(order.id);
+                          }}
+                          className={`${btnDanger} text-xs py-1.5`}
+                        >
+                          Cancel Booking
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <span className="rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
                     Track Details →

@@ -19,15 +19,28 @@ const loginCustomer = async (req, res, next) => {
     }
 };
 
-const resetPassword = async (req, res, next) => {
-     try{
-         await customerService.forgotPassword(req.body.email);
-         return ApiResponse.success(res, "Password reset email sent successfully");
-     }
-     catch(error){
+const forgotPassword = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: "Email is required" });
+        }
+        const result = await customerService.forgotPassword(email);
+        return ApiResponse.success(res, result.message || "Password reset email sent successfully");
+    } catch (error) {
         next(error);
-     }
-}
+    }
+};
+
+const resetPassword = async (req, res, next) => {
+    try {
+        const { token, password } = req.body;
+        const result = await customerService.resetPassword(token, password);
+        return ApiResponse.success(res, result.message || "Password reset successfully");
+    } catch (error) {
+        next(error);
+    }
+};
 
 const logoutCustomer = async (req, res, next) => {
     try {
@@ -48,4 +61,4 @@ const refreshToken = async (req, res, next) => {
     }   
 };   
 
-export default { registerCustomer, loginCustomer, resetPassword, logoutCustomer, refreshToken };
+export default { registerCustomer, loginCustomer, forgotPassword, resetPassword, logoutCustomer, refreshToken };

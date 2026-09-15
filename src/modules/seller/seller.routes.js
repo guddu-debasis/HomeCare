@@ -15,5 +15,11 @@ router.post("/login", validate(LoginDto), controller.loginSeller);
 router.post("/logout", verifyAuth, verifySeller, controller.logoutSeller);
 router.post("/refresh-token", controller.refreshToken);
 router.post("/forgot-password", controller.forgotPassword);
+router.post("/reset-password", controller.resetPassword);
+router.get("/bookings", verifyAuth, verifySeller, controller.fetchSellerBookings);
+router.patch("/bookings/:id/status", verifyAuth, verifySeller, controller.updateSellerBookingStatus);
+router.get("/notifications", verifyAuth, verifySeller, controller.fetchSellerNotifications);
+router.patch("/notifications/:id/read", verifyAuth, verifySeller, controller.markSellerNotificationRead);
+router.patch("/notifications/read-all", verifyAuth, verifySeller, controller.markAllSellerNotificationsRead);
 
 export default router;

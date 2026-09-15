@@ -40,12 +40,26 @@ const logoutAdmin = async (req, res, next) => {
 
 const adminForgotPassword = async (req, res, next) => {
     try {
-        await adminService.forgotPassword(req.body.email);
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: "Email is required" });
+        }
+        await adminService.forgotPassword(email);
         return ApiResponse.success(res, "Password reset email sent successfully");
     } catch (error) {
         next(error);
     }
 };
 
-export default { registerAdmin, loginAdmin, refreshToken, logoutAdmin, adminForgotPassword };   
+const adminResetPassword = async (req, res, next) => {
+    try {
+        const { token, password } = req.body;
+        const result = await adminService.resetPassword(token, password);
+        return ApiResponse.success(res, result.message || "Password reset successfully");
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default { registerAdmin, loginAdmin, refreshToken, logoutAdmin, adminForgotPassword, adminResetPassword };   
 

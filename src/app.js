@@ -26,6 +26,50 @@ app.use("/api/v1/services", serviceRoutes);
 app.use("/api/v1/seller-services", sellerServiceRoutes);
 app.use("/api/v1/ratings", ratingsRoutes);
 
+import { resetPassword as customerReset } from "./modules/customer/customer.service.js";
+import { resetPassword as sellerReset } from "./modules/seller/seller.service.js";
+import { resetPassword as adminReset } from "./modules/admin/admin.service.js";
+import ApiResponse from "./common/utils/api-response.js";
+import ApiError from "./common/utils/api-error.js";
+
+// Universal reset-password endpoint that handles tokens across all user roles
+app.post("/app/v1/auth/reset-password", async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      throw ApiError.badRequest("Token and password are required");
+    }
+
+    // Try customer
+    try {
+      const result = await customerReset(token, password);
+      return ApiResponse.success(res, result.message, { role: "customer" });
+    } catch (err) {
+      if (err.message?.includes("expired")) throw err;
+    }
+
+    // Try seller
+    try {
+      const result = await sellerReset(token, password);
+      return ApiResponse.success(res, result.message, { role: "seller" });
+    } catch (err) {
+      if (err.message?.includes("expired")) throw err;
+    }
+
+    // Try admin
+    try {
+      const result = await adminReset(token, password);
+      return ApiResponse.success(res, result.message, { role: "admin" });
+    } catch (err) {
+      if (err.message?.includes("expired")) throw err;
+    }
+
+    throw ApiError.badRequest("Invalid or expired password reset link");
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Must be registered last — catches every next(error) from the routes above
 app.use(errorHandler);
 

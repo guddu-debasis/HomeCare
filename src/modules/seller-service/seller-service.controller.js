@@ -35,4 +35,45 @@ const removeServiceFromSeller = async (req, res, next) => {
   }
 };
 
-export { addServiceToSeller, fetchSellerServices, removeServiceFromSeller };
+const updateServiceForSeller = async (req, res, next) => {
+  try {
+    const sellerId = req.user.id;
+    const serviceId = Number(req.params.serviceId || req.body.serviceId);
+    const updated = await sellerServiceService.updateSellerService({
+      sellerId,
+      serviceId,
+      ...req.body,
+    });
+    return ApiResponse.success(res, "Service rate updated successfully", updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const fetchAllSellerServices = async (req, res, next) => {
+  try {
+    const offerings = await sellerServiceService.getAllOfferings();
+    return ApiResponse.success(res, "All seller offerings retrieved successfully", offerings);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const fetchProvidersByService = async (req, res, next) => {
+  try {
+    const serviceId = Number(req.params.serviceId);
+    const providers = await sellerServiceService.getProvidersByServiceId(serviceId);
+    return ApiResponse.success(res, "Providers for service retrieved successfully", providers);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export {
+  addServiceToSeller,
+  fetchSellerServices,
+  removeServiceFromSeller,
+  updateServiceForSeller,
+  fetchAllSellerServices,
+  fetchProvidersByService,
+};

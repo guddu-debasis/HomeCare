@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ordersApi, ratingsApi } from "../../lib/api";
 import { formatMoney, formatDate } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
-import { btnPrimary, btnSecondary, input } from "../../lib/ui";
+import { btnPrimary, btnSecondary, btnDanger, input } from "../../lib/ui";
 import StatusBadge from "../../components/StatusBadge";
 import Stars from "../../components/Stars";
 import Footer from "../../components/Footer";
@@ -73,6 +73,9 @@ export default function OrderDetail() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     ordersApi
@@ -81,6 +84,20 @@ export default function OrderDetail() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleCancelBooking = async () => {
+    setCancelling(true);
+    try {
+      await ordersApi.cancel(id);
+      showSuccess(`Booking #${id} has been cancelled successfully.`);
+      setOrder((prev) => (prev ? { ...prev, status: "cancelled" } : prev));
+      setShowCancelModal(false);
+    } catch (err) {
+      showError(err.message || "Failed to cancel booking.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const getStepIndex = (status) => {
     const s = (status || "pending").toLowerCase();
@@ -95,14 +112,27 @@ export default function OrderDetail() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
       <div className="mx-auto max-w-4xl px-6 py-12 w-full space-y-8">
         {/* Header */}
-        <div className="border-b border-slate-800 pb-6 flex items-center justify-between gap-4">
+        <div className="border-b border-slate-800 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <Link to="/orders" className="text-xs font-bold text-slate-400 hover:text-white transition-colors">
               ← Back to My Bookings
             </Link>
             <h1 className="font-display text-3xl font-bold text-white mt-1">Booking #{id} Tracker</h1>
           </div>
-          {order && <StatusBadge status={order.status} />}
+          {order && (
+            <div className="flex items-center gap-3">
+              {(order.status || "").toLowerCase() === "pending" && (
+                <button
+                  type="button"
+                  onClick={() => setShowCancelModal(true)}
+                  className={`${btnDanger} px-3 py-1.5`}
+                >
+                  Cancel Booking
+                </button>
+              )}
+              <StatusBadge status={order.status} />
+            </div>
+          )}
         </div>
 
         {loading && (
@@ -120,45 +150,61 @@ export default function OrderDetail() {
 
         {order && (
           <>
-            {/* Step-by-Step Status Tracker */}
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 backdrop-blur-xl space-y-6">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Order Status Timeline</h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 relative">
-                {[
-                  { step: 1, title: "Order Placed", desc: "Booking received" },
-                  { step: 2, title: "Provider Confirmed", desc: "Provider assigned" },
-                  { step: 3, title: "Service In Progress", desc: "Specialist on site" },
-                  { step: 4, title: "Completed", desc: "Work completed" },
-                ].map((s) => {
-                  const activeStep = getStepIndex(order.status);
-                  const isPassed = s.step <= activeStep;
-                  const isCurrent = s.step === activeStep;
-
-                  return (
-                    <div key={s.step} className="flex flex-col items-center text-center space-y-2 relative z-10">
-                      <div
-                        className={`flex h-12 w-12 items-center justify-center rounded-2xl font-black text-sm transition-all ${
-                          isCurrent
-                            ? "bg-amber-500 text-slate-950 ring-4 ring-amber-500/20 shadow-lg shadow-amber-500/30"
-                            : isPassed
-                            ? "bg-emerald-500 text-slate-950"
-                            : "bg-slate-800 text-slate-500 border border-slate-700"
-                        }`}
-                      >
-                        {isPassed && !isCurrent ? "✓" : s.step}
-                      </div>
-                      <div>
-                        <p className={`text-xs font-bold ${isPassed ? "text-slate-100" : "text-slate-500"}`}>
-                          {s.title}
-                        </p>
-                        <p className="text-[11px] text-slate-500">{s.desc}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* Step-by-Step Status Tracker OR Cancelled Banner */}
+            {(order.status || "").toLowerCase() === "cancelled" ? (
+              <div className="rounded-3xl border border-red-500/30 bg-red-950/20 p-8 backdrop-blur-xl">
+                <div className="flex items-start sm:items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-500/20 text-red-400 text-xl font-black border border-red-500/30">
+                    ✕
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-display text-lg font-bold text-white">Booking Cancelled</h3>
+                    <p className="text-xs text-red-300">
+                      This service booking has been cancelled. No providers will be dispatched and any pending services have been stopped.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 backdrop-blur-xl space-y-6">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Order Status Timeline</h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 relative">
+                  {[
+                    { step: 1, title: "Order Placed", desc: "Booking received" },
+                    { step: 2, title: "Provider Confirmed", desc: "Provider assigned" },
+                    { step: 3, title: "Service In Progress", desc: "Specialist on site" },
+                    { step: 4, title: "Completed", desc: "Work completed" },
+                  ].map((s) => {
+                    const activeStep = getStepIndex(order.status);
+                    const isPassed = s.step <= activeStep;
+                    const isCurrent = s.step === activeStep;
+
+                    return (
+                      <div key={s.step} className="flex flex-col items-center text-center space-y-2 relative z-10">
+                        <div
+                          className={`flex h-12 w-12 items-center justify-center rounded-2xl font-black text-sm transition-all ${
+                            isCurrent
+                              ? "bg-amber-500 text-slate-950 ring-4 ring-amber-500/20 shadow-lg shadow-amber-500/30"
+                              : isPassed
+                              ? "bg-emerald-500 text-slate-950"
+                              : "bg-slate-800 text-slate-500 border border-slate-700"
+                          }`}
+                        >
+                          {isPassed && !isCurrent ? "✓" : s.step}
+                        </div>
+                        <div>
+                          <p className={`text-xs font-bold ${isPassed ? "text-slate-100" : "text-slate-500"}`}>
+                            {s.title}
+                          </p>
+                          <p className="text-[11px] text-slate-500">{s.desc}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Booking Overview Card */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -218,6 +264,43 @@ export default function OrderDetail() {
           </>
         )}
       </div>
+
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-500/20 text-red-400 text-xl font-bold">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Cancel Booking #{id}?</h3>
+                <p className="text-xs text-slate-400">Are you sure you want to cancel this booking?</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-300">
+              This will immediately cancel your appointment. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={() => setShowCancelModal(false)}
+                className={btnSecondary}
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={handleCancelBooking}
+                className="inline-flex items-center justify-center rounded-xl bg-red-600 hover:bg-red-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-900/20 transition-all disabled:opacity-50"
+              >
+                {cancelling ? "Cancelling..." : "Yes, Cancel Booking"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

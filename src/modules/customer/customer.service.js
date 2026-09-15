@@ -148,4 +148,39 @@ const forgotPassword = async (email) => {
   };
 };
 
-export { register, login, refresh, logout, forgotPassword };
+const resetPassword = async (token, newPassword) => {
+  if (!token) throw ApiError.badRequest("Reset token is required");
+  if (!newPassword || newPassword.length < 8) {
+    throw ApiError.badRequest("Password must be at least 8 characters");
+  }
+
+  const hashedToken = hashToken(token);
+  const [user] = await db
+    .select()
+    .from(customers)
+    .where(eq(customers.resetPasswordToken, hashedToken))
+    .limit(1);
+
+  if (!user) {
+    throw ApiError.badRequest("Invalid or expired password reset link");
+  }
+
+  if (new Date() > new Date(user.resetPasswordExpires)) {
+    throw ApiError.badRequest("Password reset link has expired. Please request a new one.");
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  await db
+    .update(customers)
+    .set({
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+      refreshToken: null,
+    })
+    .where(eq(customers.id, user.id));
+
+  return { message: "Password reset successfully. You can now log in with your new password." };
+};
+
+export { register, login, refresh, logout, forgotPassword, resetPassword };

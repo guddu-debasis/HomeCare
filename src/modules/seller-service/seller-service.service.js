@@ -1,5 +1,5 @@
 import { db } from "../../common/config/db.js";
-import { sellerService, service } from "../../db/schema.js";
+import { sellerService, service, seller } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import ApiError from "../../common/utils/api-error.js";
 
@@ -23,7 +23,27 @@ const addSellerService = async ({ sellerId, serviceId, customPrice, description 
     .limit(1);
 
   if (existingMapping) {
-    throw ApiError.conflict("You already offer this service");
+    // If the seller already offers this service, update their custom price and description
+    const updatedCustomPrice =
+      customPrice !== undefined
+        ? (customPrice === null || customPrice === "" ? null : String(customPrice))
+        : existingMapping.customPrice;
+
+    const updatedDescription =
+      description !== undefined
+        ? (description === null || description === "" ? null : description)
+        : existingMapping.description;
+
+    const [updatedMapping] = await db
+      .update(sellerService)
+      .set({
+        customPrice: updatedCustomPrice,
+        description: updatedDescription,
+      })
+      .where(eq(sellerService.id, existingMapping.id))
+      .returning();
+
+    return updatedMapping;
   }
 
   // 3. Insert the mapping
@@ -32,7 +52,7 @@ const addSellerService = async ({ sellerId, serviceId, customPrice, description 
     .values({
       sellerId,
       serviceId,
-      customPrice: customPrice || null,
+      customPrice: customPrice ? String(customPrice) : null,
       description: description || null,
     })
     .returning();
@@ -73,4 +93,82 @@ const removeSellerService = async (sellerId, serviceId) => {
   return { message: "Service removed from seller profile successfully" };
 };
 
-export { addSellerService, getSellerServices, removeSellerService };
+const updateSellerService = async ({ sellerId, serviceId, customPrice, description }) => {
+  const numericServiceId = Number(serviceId);
+  const [existingMapping] = await db
+    .select()
+    .from(sellerService)
+    .where(and(eq(sellerService.sellerId, sellerId), eq(sellerService.serviceId, numericServiceId)))
+    .limit(1);
+
+  if (!existingMapping) {
+    throw ApiError.notFound("Service assignment not found for this seller");
+  }
+
+  const updatedCustomPrice =
+    customPrice !== undefined
+      ? (customPrice === null || customPrice === "" ? null : String(customPrice))
+      : existingMapping.customPrice;
+
+  const updatedDescription =
+    description !== undefined
+      ? (description === null || description === "" ? null : description)
+      : existingMapping.description;
+
+  const [updatedMapping] = await db
+    .update(sellerService)
+    .set({
+      customPrice: updatedCustomPrice,
+      description: updatedDescription,
+    })
+    .where(eq(sellerService.id, existingMapping.id))
+    .returning();
+
+  return updatedMapping;
+};
+
+const getAllOfferings = async () => {
+  return await db
+    .select({
+      id: sellerService.id,
+      serviceId: service.id,
+      serviceName: service.serviceName,
+      basePrice: service.basePrice,
+      customPrice: sellerService.customPrice,
+      description: sellerService.description,
+      sellerId: seller.id,
+      sellerName: seller.username,
+      sellerPhone: seller.phNo,
+    })
+    .from(sellerService)
+    .innerJoin(service, eq(sellerService.serviceId, service.id))
+    .innerJoin(seller, eq(sellerService.sellerId, seller.id));
+};
+
+const getProvidersByServiceId = async (serviceId) => {
+  return await db
+    .select({
+      id: sellerService.id,
+      serviceId: service.id,
+      serviceName: service.serviceName,
+      basePrice: service.basePrice,
+      customPrice: sellerService.customPrice,
+      description: sellerService.description,
+      sellerId: seller.id,
+      sellerName: seller.username,
+      sellerPhone: seller.phNo,
+    })
+    .from(sellerService)
+    .innerJoin(service, eq(sellerService.serviceId, service.id))
+    .innerJoin(seller, eq(sellerService.sellerId, seller.id))
+    .where(eq(sellerService.serviceId, Number(serviceId)));
+};
+
+export {
+  addSellerService,
+  getSellerServices,
+  removeSellerService,
+  updateSellerService,
+  getAllOfferings,
+  getProvidersByServiceId,
+};

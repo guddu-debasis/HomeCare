@@ -1,5 +1,10 @@
 import express from "express";
-import { createNewOrder, fetchCustomerOrders, fetchOrderDetails } from "./order.controller.js";
+import {
+  createNewOrder,
+  fetchCustomerOrders,
+  fetchOrderDetails,
+  cancelOrderRequest,
+} from "./order.controller.js";
 import { verifyAuth, verifyCustomer } from "../../common/middlewares/auth.middleware.js";
 import validate from "../../common/middlewares/validate.middleware.js";
 import CreateOrderDto from "./dto/create-order.dto.js";
@@ -12,5 +17,7 @@ router.use(verifyAuth, verifyCustomer);
 router.post("/", validate(CreateOrderDto), createNewOrder);
 router.get("/", fetchCustomerOrders);
 router.get("/:id", fetchOrderDetails);
+router.patch("/:id/cancel", cancelOrderRequest);
+router.post("/:id/cancel", cancelOrderRequest);
 
 export default router;

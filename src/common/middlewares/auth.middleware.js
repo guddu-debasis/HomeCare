@@ -14,6 +14,12 @@ const verifyAuth = (req, res, next) => {
     req.user = decoded; // Contains { id, role }
     next();
   } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return next(ApiError.unauthorized("Access token has expired"));
+    }
+    if (error.name === "JsonWebTokenError") {
+      return next(ApiError.unauthorized("Invalid access token"));
+    }
     next(error);
   }
 };
@@ -39,4 +45,11 @@ const verifyCustomer = (req, res, next) => {
   next();
 };
 
-export { verifyAuth, verifyAdmin, verifySeller, verifyCustomer };
+const verifyAdminOrSeller = (req, res, next) => {
+  if (!req.user || (req.user.role !== "admin" && req.user.role !== "seller")) {
+    return next(ApiError.forbidden("Access denied. Admin or Seller privileges required."));
+  }
+  next();
+};
+
+export { verifyAuth, verifyAdmin, verifySeller, verifyCustomer, verifyAdminOrSeller };

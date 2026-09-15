@@ -15,5 +15,6 @@ router.post("/login", validate(LoginDto), controller.loginAdmin);
 router.post("/logout", verifyAuth, verifyAdmin, controller.logoutAdmin);
 router.post("/refresh-token", controller.refreshToken);
 router.post("/forgot-password", controller.adminForgotPassword);
+router.post("/reset-password", controller.adminResetPassword);
 
 export default router;

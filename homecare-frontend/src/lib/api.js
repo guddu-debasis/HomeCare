@@ -39,11 +39,68 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
-// Unwrap the { success, message, data } envelope and normalise errors
-// coming back from ApiError / the Joi validate middleware.
+let refreshPromise = null;
+
+// Unwrap the { success, message, data } envelope, auto-refresh expired JWTs,
+// and normalise errors coming back from ApiError / the Joi validate middleware.
 client.interceptors.response.use(
   (res) => res.data,
-  (err) => {
+  async (err) => {
+    const originalRequest = err.config;
+
+    // If 401 (token expired/invalid) and request hasn't been retried yet
+    if (err.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const session = getSession();
+
+      if (session?.refreshToken && session?.role) {
+        try {
+          if (!refreshPromise) {
+            refreshPromise = axios
+              .post(`${BASE_URL}/app/v1/${session.role}/refresh-token`, {
+                refreshToken: session.refreshToken,
+              })
+              .then((res) => res.data)
+              .finally(() => {
+                refreshPromise = null;
+              });
+          }
+
+          const refreshRes = await refreshPromise;
+          const { accessToken, refreshToken: newRefreshToken } = refreshRes?.data || {};
+
+          if (accessToken) {
+            saveSession({
+              accessToken,
+              refreshToken: newRefreshToken || session.refreshToken,
+              role: session.role,
+              user: session.user,
+            });
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            return client(originalRequest);
+          }
+        } catch {
+          clearSession();
+          if (
+            typeof window !== "undefined" &&
+            !window.location.pathname.startsWith("/login") &&
+            !window.location.pathname.startsWith("/register")
+          ) {
+            window.location.href = "/login";
+          }
+        }
+      } else {
+        clearSession();
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/login") &&
+          !window.location.pathname.startsWith("/register")
+        ) {
+          window.location.href = "/login";
+        }
+      }
+    }
+
     const message =
       err.response?.data?.message ||
       err.response?.data?.error ||
@@ -63,6 +120,11 @@ export const authApi = {
       role === "customer" ? `/app/v1/customer/forgot-password` : `/app/v1/${role}/forgot-password`,
       { email }
     ),
+  resetPassword: ({ token, password, role }) =>
+    client.post(
+      role ? `/app/v1/${role}/reset-password` : `/app/v1/auth/reset-password`,
+      { token, password }
+    ),
 };
 
 // ---------- Master service catalog ----------
@@ -75,8 +137,11 @@ export const servicesApi = {
 // ---------- Seller service offerings ----------
 // Requires seller-service.routes.js to be mounted in app.js (see setup notes).
 export const sellerServicesApi = {
+  listAll: () => client.get("/api/v1/seller-services"),
+  listByService: (serviceId) => client.get(`/api/v1/seller-services/service/${serviceId}`),
   listForSeller: (sellerId) => client.get(`/api/v1/seller-services/seller/${sellerId}`),
   add: (payload) => client.post("/api/v1/seller-services", payload),
+  update: (serviceId, payload) => client.patch(`/api/v1/seller-services/${serviceId}`, payload),
   remove: (serviceId) => client.delete(`/api/v1/seller-services/${serviceId}`),
 };
 
@@ -92,6 +157,7 @@ export const ordersApi = {
   create: (bookingDate) => client.post("/api/v1/orders", { bookingDate }),
   list: () => client.get("/api/v1/orders"),
   get: (id) => client.get(`/api/v1/orders/${id}`),
+  cancel: (id) => client.patch(`/api/v1/orders/${id}/cancel`),
 };
 
 // ---------- Ratings ----------
@@ -99,6 +165,20 @@ export const ordersApi = {
 export const ratingsApi = {
   listForSeller: (sellerId) => client.get(`/api/v1/ratings/seller/${sellerId}`),
   add: (payload) => client.post("/api/v1/ratings", payload),
+};
+
+// ---------- Seller Bookings & Operations ----------
+export const sellerBookingsApi = {
+  list: () => client.get("/app/v1/seller/bookings"),
+  updateStatus: (bookingId, status) =>
+    client.patch(`/app/v1/seller/bookings/${bookingId}/status`, { status }),
+};
+
+// ---------- Seller Notifications ----------
+export const sellerNotificationsApi = {
+  list: () => client.get("/app/v1/seller/notifications"),
+  markRead: (id) => client.patch(`/app/v1/seller/notifications/${id}/read`),
+  markAllRead: () => client.patch("/app/v1/seller/notifications/read-all"),
 };
 
 export default client;

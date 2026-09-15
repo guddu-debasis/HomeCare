@@ -1,4 +1,4 @@
-import { pgTable, serial, bigint, varchar, decimal, timestamp, date, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, serial, bigint, varchar, decimal, timestamp, date, integer, pgEnum, boolean } from 'drizzle-orm/pg-core';
 
 // Enums
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'paid', 'failed', 'refunded']);
@@ -110,4 +110,16 @@ export const ratings = pgTable('Ratings', {
   ratingScore: integer('rating_score').notNull(),
   comment: varchar('comment', { length: 500 }),
   createdAt: timestamp('createdAt').defaultNow(),
+});
+
+// Notifications Table
+export const notifications = pgTable('Notifications', {
+  id: serial('id').primaryKey(),
+  sellerId: integer('seller_id').notNull().references(() => seller.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: varchar('message', { length: 1000 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull().default('order'),
+  link: varchar('link', { length: 255 }),
+  isRead: boolean('is_read').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow(),
 });

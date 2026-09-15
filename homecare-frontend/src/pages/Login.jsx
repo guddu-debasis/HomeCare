@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { input, btnPrimary } from "../lib/ui";
+import { authApi } from "../lib/api";
+import { input, btnPrimary, btnSecondary } from "../lib/ui";
+import Modal from "../components/Modal";
 import Footer from "../components/Footer";
 
 const ROLES = [
@@ -16,6 +18,13 @@ export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Forgot Password Modal State
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotRole, setForgotRole] = useState("customer");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   const { login } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -46,6 +55,32 @@ export default function Login() {
       showError(err.message || "Failed to log in.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openForgotPassword = () => {
+    setForgotEmail(form.email || "");
+    setForgotRole(role);
+    setForgotSent(false);
+    setIsForgotModalOpen(true);
+  };
+
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      showError("Please enter your registered email address.");
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const res = await authApi.forgotPassword(forgotRole, forgotEmail.trim());
+      showSuccess(res.message || "Password reset link sent to your email!");
+      setForgotSent(true);
+    } catch (err) {
+      showError(err.message || "Failed to send reset link. Please check the email and try again.");
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -105,7 +140,7 @@ export default function Login() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => alert("Password reset emails are handled automatically on request.")}
+                  onClick={openForgotPassword}
                   className="text-[11px] font-semibold text-amber-400 hover:underline"
                 >
                   Forgot Password?
@@ -145,6 +180,95 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <Modal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        title="Reset Password"
+      >
+        {forgotSent ? (
+          <div className="space-y-4 text-center py-2">
+            <div className="text-4xl">📬</div>
+            <h4 className="font-bold text-lg text-white">Reset Link Sent!</h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              We've dispatched an email to <strong className="text-amber-400">{forgotEmail}</strong> with a secure link to reset your password.
+            </p>
+            <p className="text-[11px] text-slate-400">
+              The link will expire in 15 minutes. Check your spam folder if it doesn't arrive shortly.
+            </p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsForgotModalOpen(false)}
+                className={`${btnPrimary} w-full py-2.5`}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+            <p className="text-xs text-slate-400">
+              Select your account type and enter your email address. We'll send you a link to reset your password.
+            </p>
+
+            {/* Role selector inside modal */}
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Account Type
+              </label>
+              <div className="flex gap-2">
+                {ROLES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => setForgotRole(r.key)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                      forgotRole === r.key
+                        ? "bg-amber-500 text-slate-950 border-amber-400 font-bold"
+                        : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {r.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Registered Email
+              </label>
+              <input
+                type="email"
+                required
+                placeholder="name@example.com"
+                className={input}
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsForgotModalOpen(false)}
+                className={btnSecondary}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className={btnPrimary}
+              >
+                {forgotLoading ? "Sending Link..." : "Send Reset Link"}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       <Footer />
     </div>

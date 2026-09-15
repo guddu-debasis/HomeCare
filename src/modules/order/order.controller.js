@@ -35,4 +35,17 @@ const fetchOrderDetails = async (req, res, next) => {
   }
 };
 
-export { createNewOrder, fetchCustomerOrders, fetchOrderDetails };
+const cancelOrderRequest = async (req, res, next) => {
+  try {
+    const orderId = Number(req.params.id);
+    const customerId = req.user.id;
+
+    const cancelledOrder = await orderService.cancelOrderService(orderId, customerId);
+
+    return ApiResponse.success(res, "Order cancelled successfully", cancelledOrder);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export { createNewOrder, fetchCustomerOrders, fetchOrderDetails, cancelOrderRequest };

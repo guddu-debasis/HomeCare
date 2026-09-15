@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { cartApi } from "../lib/api";
+import ThemeToggle from "./ThemeToggle";
+import NotificationBell from "./NotificationBell";
 
 const linkBase =
   "text-sm font-medium transition-all px-3 py-1.5 rounded-lg flex items-center gap-2";
@@ -47,7 +49,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl transition-all">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-3 group" onClick={closeMenu}>
+        <Link to={role === "seller" ? "/seller/services" : "/"} className="flex items-center gap-3 group" onClick={closeMenu}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 font-black text-slate-950 shadow-lg shadow-amber-600/20 group-hover:scale-105 transition-all">
             <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
               <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
@@ -65,12 +67,14 @@ export default function Navbar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-2 md:flex">
-          <NavLink to="/" end className={getLinkClass}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            Services Catalog
-          </NavLink>
+          {role !== "seller" && (
+            <NavLink to="/" end className={getLinkClass}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Services Catalog
+            </NavLink>
+          )}
 
           {role === "customer" && (
             <>
@@ -117,6 +121,8 @@ export default function Navbar() {
           )}
 
           <div className="ml-4 flex items-center gap-3 border-l border-slate-800 pl-4">
+            <ThemeToggle />
+            {isAuthenticated && role === "seller" && <NotificationBell />}
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5">
@@ -162,30 +168,36 @@ export default function Navbar() {
           </div>
         </nav>
 
-        {/* Mobile menu toggle */}
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-slate-300 hover:text-white md:hidden"
-        >
-          {menuOpen ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-          )}
-        </button>
+        {/* Mobile controls */}
+        <div className="flex items-center gap-2 md:hidden">
+          <ThemeToggle />
+          {isAuthenticated && role === "seller" && <NotificationBell />}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-slate-300 hover:text-white"
+          >
+            {menuOpen ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile nav panel */}
       {menuOpen && (
         <nav className="border-t border-slate-800 bg-slate-950 px-6 py-4 space-y-2 md:hidden animate-fade-in">
-          <NavLink to="/" end className={getLinkClass} onClick={closeMenu}>
-            Services Catalog
-          </NavLink>
+          {role !== "seller" && (
+            <NavLink to="/" end className={getLinkClass} onClick={closeMenu}>
+              Services Catalog
+            </NavLink>
+          )}
 
           {role === "customer" && (
             <>
