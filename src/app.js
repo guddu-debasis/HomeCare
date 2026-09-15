@@ -1,5 +1,6 @@
 import express from "express"
 import cors from "cors"
+import passport from "./common/config/passport.js"
 
 import adminRoutes from "./modules/admin/admin.routes.js"
 import sellerRoutes from "./modules/seller/seller.routes.js"
@@ -27,6 +28,8 @@ app.use(cors({
   },
   credentials: true
 }));
+
+app.use(passport.initialize()) // stateless — no sessions, JWT handles auth
 
 // Stash the raw request bytes alongside the parsed body. The Razorpay webhook
 // signature is computed over the exact raw payload Razorpay sent — re-serializing

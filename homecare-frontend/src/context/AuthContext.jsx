@@ -14,6 +14,11 @@ export function AuthProvider({ children }) {
     return user;
   }, []);
 
+  // Used by OAuthCallback to hydrate session from URL params without an API call
+  const setSessionDirectly = useCallback(({ role, refreshToken, user }) => {
+    setSession({ role, refreshToken, user });
+  }, []);
+
   const register = useCallback(async (role, payload) => {
     const res = await authApi.register(role, payload);
     return res.data;
@@ -36,6 +41,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    setSessionDirectly,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -51,7 +51,7 @@ const login = async ({ email, password }) => {
   }
 
   const accessToken = generateAccessToken({ id: user.id, role: "customer" });
-  const refreshToken = generateRefreshToken({ id: user.id });
+  const refreshToken = generateRefreshToken({ id: user.id, role: "customer" });
 
   const hashedRefreshToken = hashToken(refreshToken);
   await db
@@ -70,6 +70,10 @@ const refresh = async (token) => {
   if (!token) throw ApiError.unauthorized("Refresh token missing");
   const decoded = verifyRefreshToken(token);
 
+  if (decoded.role !== "customer") {
+    throw ApiError.unauthorized("Invalid refresh token");
+  }
+
   const [user] = await db.select().from(customers).where(eq(customers.id, decoded.id)).limit(1);
   if (!user) throw ApiError.unauthorized("User not found");
 
@@ -78,7 +82,7 @@ const refresh = async (token) => {
   }
 
   const accessToken = generateAccessToken({ id: user.id, role: "customer" });
-  const refreshToken = generateRefreshToken({ id: user.id });
+  const refreshToken = generateRefreshToken({ id: user.id, role: "customer" });
 
   const hashedRefreshToken = hashToken(refreshToken);
   await db

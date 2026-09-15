@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
+import OAuthCallback from "./pages/OAuthCallback";
 import SellerProfile from "./pages/SellerProfile";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/oauth/callback" element={<OAuthCallback />} />
                 <Route path="/reset-password/:token" element={<ResetPassword />} />
                 <Route path="/sellers/:sellerId" element={<SellerProfile />} />
 
