@@ -2,6 +2,7 @@ import { db } from "../../common/config/db.js";
 import { orderBooking, orderItems, cartItems, service, sellerService, notifications, customers } from "../../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import ApiError from "../../common/utils/api-error.js";
+import razorpay from "../../common/config/razorpay.js";
 
 const createOrder = async ({ customerId, bookingDate }) => {
   // Joi.date().iso() coerces the incoming string into a JS Date object.
@@ -147,17 +148,35 @@ const cancelOrderService = async (orderId, customerId) => {
     throw ApiError.badRequest(`Cannot cancel an order that is already ${order.status}`);
   }
 
-  // 3. Update status to cancelled
+  // 3. Issue Razorpay refund if the order was already paid
+  let refundIssued = false;
+  if (order.paymentStatus === "paid" && order.razorpayPaymentId) {
+    try {
+      const amountInPaise = Math.round(Number(order.totalAmount) * 100);
+      await razorpay.payments.refund(order.razorpayPaymentId, {
+        amount: amountInPaise,
+        speed: "normal",  // "normal" = 5-7 business days, "optimum" = instant if eligible
+        notes: { reason: "Order cancelled by customer", orderId: String(numericOrderId) },
+      });
+      refundIssued = true;
+    } catch (refundErr) {
+      // Log but don't block the cancellation — admin can manually refund
+      console.error("Razorpay refund failed:", refundErr?.error ?? refundErr);
+    }
+  }
+
+  // 4. Update status to cancelled (+ paymentStatus to refunded if refund was issued)
   const [updatedOrder] = await db
     .update(orderBooking)
     .set({
       status: "cancelled",
+      paymentStatus: refundIssued ? "refunded" : order.paymentStatus,
       updatedAt: new Date(),
     })
     .where(eq(orderBooking.id, numericOrderId))
     .returning();
 
-  // Notify sellers about cancellation
+  // 5. Notify sellers + customer about cancellation & refund
   try {
     const items = await db
       .select({
@@ -168,6 +187,7 @@ const cancelOrderService = async (orderId, customerId) => {
       .leftJoin(service, eq(orderItems.serviceId, service.id))
       .where(eq(orderItems.orderId, numericOrderId));
 
+    // Notify each seller
     for (const item of items) {
       if (item.sellerId) {
         await db.insert(notifications).values({
@@ -179,6 +199,22 @@ const cancelOrderService = async (orderId, customerId) => {
           isRead: false,
         });
       }
+    }
+
+    // Notify customer about refund status
+    if (order.paymentStatus === "paid") {
+      const refundMsg = refundIssued
+        ? `Your payment of ₹${Number(order.totalAmount).toFixed(2)} for Order #${numericOrderId} has been refunded. It will reflect in your account within 5-7 business days.`
+        : `Your Order #${numericOrderId} was cancelled. We were unable to process the refund automatically — please contact support.`;
+
+      await db.insert(notifications).values({
+        customerId,
+        title: refundIssued ? `Refund Initiated – Order #${numericOrderId}` : `Cancellation Confirmed – Order #${numericOrderId}`,
+        message: refundMsg,
+        type: "refund",
+        link: "/customer/orders",
+        isRead: false,
+      });
     }
   } catch (notifErr) {
     console.error("Failed to create cancellation notifications:", notifErr);
