@@ -1,5 +1,6 @@
 import * as orderService from "./order.service.js";
 import ApiResponse from "../../common/utils/api-response.js";
+import ApiError from "../../common/utils/api-error.js";
 
 const createNewOrder = async (req, res, next) => {
   try {
@@ -28,6 +29,9 @@ const fetchOrderDetails = async (req, res, next) => {
   try {
     const customerId = req.user.id;
     const orderId = Number(req.params.id);
+    if (!Number.isInteger(orderId)) {
+      throw ApiError.badRequest("Invalid order id");
+    }
     const order = await orderService.getOrderById(orderId, customerId);
     return ApiResponse.success(res, "Order details retrieved successfully", order);
   } catch (error) {
@@ -38,6 +42,9 @@ const fetchOrderDetails = async (req, res, next) => {
 const cancelOrderRequest = async (req, res, next) => {
   try {
     const orderId = Number(req.params.id);
+    if (!Number.isInteger(orderId)) {
+      throw ApiError.badRequest("Invalid order id");
+    }
     const customerId = req.user.id;
 
     const cancelledOrder = await orderService.cancelOrderService(orderId, customerId);

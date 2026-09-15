@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ordersApi, ratingsApi } from "../../lib/api";
+import { ordersApi, ratingsApi, paymentsApi, waitForPaymentStatus } from "../../lib/api";
 import { formatMoney, formatDate } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
 import { btnPrimary, btnSecondary, btnDanger, input } from "../../lib/ui";
@@ -75,6 +75,7 @@ export default function OrderDetail() {
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [paying, setPaying] = useState(false);
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
@@ -96,6 +97,82 @@ export default function OrderDetail() {
       showError(err.message || "Failed to cancel booking.");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handlePayNow = async () => {
+    setPaying(true);
+    try {
+      const rpRes = await paymentsApi.createOrder(order.id);
+
+      if (!window.Razorpay) {
+        showError("Payment gateway failed to load. Please refresh and try again.");
+        return;
+      }
+
+      const { razorpayOrderId, amount, currency, keyId } = rpRes.data;
+
+      const rzp = new window.Razorpay({
+        key: keyId,
+        amount,
+        currency,
+        name: "Hearth",
+        description: `Booking #${order.id}`,
+        order_id: razorpayOrderId,
+        theme: { color: "#f59e0b" },
+        handler: async (response) => {
+          try {
+            await paymentsApi.verify({
+              orderId: order.id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            setOrder((prev) => (prev ? { ...prev, paymentStatus: "paid" } : prev));
+            showSuccess("Payment successful!");
+          } catch (err) {
+            // The browser-side verify call failed, but the charge may still have
+            // gone through — the server-side webhook confirms it independently
+            // a little after this. Check before telling the customer it failed.
+            const settled = await waitForPaymentStatus(order.id);
+            if (settled) {
+              setOrder((prev) => (prev ? { ...prev, paymentStatus: "paid" } : prev));
+              showSuccess("Payment successful!");
+            } else {
+              showError(err.message || "Payment could not be verified. Contact support if you were charged.");
+            }
+          }
+        },
+        modal: {
+          ondismiss: async () => {
+            // Closing the modal isn't proof of failure — give the webhook a
+            // moment to confirm before assuming the payment didn't go through.
+            const settled = await waitForPaymentStatus(order.id);
+            if (settled) {
+              setOrder((prev) => (prev ? { ...prev, paymentStatus: "paid" } : prev));
+              showSuccess("Payment successful!");
+            } else {
+              showError("Payment wasn't completed.");
+            }
+          },
+        },
+      });
+
+      rzp.on("payment.failed", async () => {
+        const settled = await waitForPaymentStatus(order.id);
+        if (settled) {
+          setOrder((prev) => (prev ? { ...prev, paymentStatus: "paid" } : prev));
+          showSuccess("Payment successful!");
+        } else {
+          showError("Payment failed. Please try again.");
+        }
+      });
+
+      rzp.open();
+    } catch (err) {
+      showError(err.message || "Could not start payment.");
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -121,6 +198,17 @@ export default function OrderDetail() {
           </div>
           {order && (
             <div className="flex items-center gap-3">
+              {(order.paymentStatus === "pending" || order.paymentStatus === "failed") &&
+                (order.status || "").toLowerCase() !== "cancelled" && (
+                  <button
+                    type="button"
+                    onClick={handlePayNow}
+                    disabled={paying}
+                    className={`${btnPrimary} px-4 py-1.5 text-sm`}
+                  >
+                    {paying ? "Opening payment…" : "Pay now"}
+                  </button>
+                )}
               {(order.status || "").toLowerCase() === "pending" && (
                 <button
                   type="button"
@@ -216,7 +304,7 @@ export default function OrderDetail() {
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Payment Status</span>
                 <div className="mt-1">
-                  <StatusBadge status={order.paymentStatus || "paid"} />
+                  <StatusBadge status={order.paymentStatus} />
                 </div>
               </div>
 

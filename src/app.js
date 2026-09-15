@@ -10,11 +10,16 @@ import serviceRoutes from "./modules/service/service.routes.js";
 import sellerServiceRoutes from "./modules/seller-service/seller-service.routes.js";
 import ratingsRoutes from "./modules/ratings/ratings.routes.js";
 import errorHandler from "./common/middlewares/error.middleware.js";
+import paymentRoutes from "./modules/payment/payment.routes.js";
 
 const app = express()
 
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
-app.use(express.json())
+// Stash the raw request bytes alongside the parsed body. The Razorpay webhook
+// signature is computed over the exact raw payload Razorpay sent — re-serializing
+// req.body with JSON.stringify is not guaranteed to match byte-for-byte (key
+// order, spacing), so signature verification needs this raw buffer.
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }))
 app.use(express.urlencoded({ extended: true }))
 
 app.use("/app/v1/admin", adminRoutes)
@@ -25,6 +30,7 @@ app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/services", serviceRoutes);
 app.use("/api/v1/seller-services", sellerServiceRoutes);
 app.use("/api/v1/ratings", ratingsRoutes);
+app.use("/api/v1/payments", paymentRoutes);
 
 import { resetPassword as customerReset } from "./modules/customer/customer.service.js";
 import { resetPassword as sellerReset } from "./modules/seller/seller.service.js";

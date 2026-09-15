@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { cartApi, ordersApi } from "../../lib/api";
+import { cartApi, ordersApi, paymentsApi, waitForPaymentStatus } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
 import { btnPrimary, btnSecondary, input } from "../../lib/ui";
@@ -61,8 +61,85 @@ export default function Cart() {
     try {
       // Backend expects { bookingDate }
       const res = await ordersApi.create(bookingDate);
-      showSuccess("Booking confirmed! Your order has been placed.");
-      navigate("/orders");
+      const bookingId = res.data.id;
+
+      let rpRes;
+      try {
+        rpRes = await paymentsApi.createOrder(bookingId);
+      } catch (err) {
+        showError(err.message || "Booking placed, but starting payment failed. Pay from your booking page.");
+        navigate(`/orders/${bookingId}`);
+        return;
+      }
+
+      if (!window.Razorpay) {
+        showError("Payment gateway failed to load. You can pay from your booking page.");
+        navigate(`/orders/${bookingId}`);
+        return;
+      }
+
+      const { razorpayOrderId, amount, currency, keyId } = rpRes.data;
+
+      const rzp = new window.Razorpay({
+        key: keyId,
+        amount,
+        currency,
+        name: "Hearth",
+        description: `Booking #${bookingId}`,
+        order_id: razorpayOrderId,
+        theme: { color: "#f59e0b" },
+        handler: async (response) => {
+          try {
+            await paymentsApi.verify({
+              orderId: bookingId,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            showSuccess("Payment successful! Your booking is confirmed.");
+          } catch (err) {
+            // The browser-side verify call failed (e.g. a dropped connection
+            // right after a successful charge). The money may still have been
+            // captured and the server-side webhook will mark the order paid a
+            // little after this — check for that before alarming the customer.
+            const settled = await waitForPaymentStatus(bookingId);
+            if (settled) {
+              showSuccess("Payment successful! Your booking is confirmed.");
+            } else {
+              showError(err.message || "Payment could not be verified. Contact support if you were charged.");
+            }
+          } finally {
+            navigate(`/orders/${bookingId}`);
+          }
+        },
+        modal: {
+          ondismiss: async () => {
+            // Closing the checkout modal doesn't necessarily mean the payment
+            // failed — e.g. a UPI app confirmed the payment but the customer
+            // closed this tab before Razorpay's handler fired. Give the webhook
+            // a moment to confirm before reporting a failure.
+            const settled = await waitForPaymentStatus(bookingId);
+            if (settled) {
+              showSuccess("Payment successful! Your booking is confirmed.");
+            } else {
+              showError("Payment wasn't completed. You can pay anytime from your booking page.");
+            }
+            navigate(`/orders/${bookingId}`);
+          },
+        },
+      });
+
+      rzp.on("payment.failed", async () => {
+        const settled = await waitForPaymentStatus(bookingId);
+        if (settled) {
+          showSuccess("Payment successful! Your booking is confirmed.");
+        } else {
+          showError("Payment failed. You can try again from your booking page.");
+        }
+        navigate(`/orders/${bookingId}`);
+      });
+
+      rzp.open();
     } catch (err) {
       showError(err.message || "Failed to place order.");
     } finally {
@@ -249,7 +326,7 @@ export default function Cart() {
                   disabled={ordering}
                   className={`${btnPrimary} w-full py-3 text-base`}
                 >
-                  {ordering ? "Processing Booking..." : "Confirm & Place Order →"}
+                  {ordering ? "Starting payment..." : "Confirm & Pay →"}
                 </button>
               </div>
             </div>

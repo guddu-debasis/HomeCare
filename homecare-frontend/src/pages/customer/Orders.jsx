@@ -124,11 +124,14 @@ export default function Orders() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <span className="font-display text-lg font-bold text-white group-hover:text-amber-400 transition-colors">
                       Booking #{order.id}
                     </span>
                     <StatusBadge status={order.status} />
+                    {order.paymentStatus && order.paymentStatus !== "paid" && (
+                      <StatusBadge status={order.paymentStatus} />
+                    )}
                   </div>
 
                   <div className="flex items-center gap-4 text-xs text-slate-400">

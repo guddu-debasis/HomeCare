@@ -86,6 +86,8 @@ export const orderBooking = pgTable('Order/Booking', {
   paymentStatus: paymentStatusEnum('payment_status').notNull().default('pending'),
   status: bookingStatusEnum('status').notNull().default('pending'),
   bookingDate: date('booking_date').notNull(),
+  razorpayOrderId: varchar('razorpay_order_id', { length: 255 }),
+  razorpayPaymentId: varchar('razorpay_payment_id', { length: 255 }),
   createdAt: timestamp('createdAt').defaultNow(),
   updatedAt: timestamp('updatedAt').defaultNow(),
 });

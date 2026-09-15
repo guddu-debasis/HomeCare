@@ -29,6 +29,9 @@ const removeCartItem = async (req, res, next) => {
   try {
     const customerId = req.user.id;
     const cartItemId = Number(req.params.id);
+    if (!Number.isInteger(cartItemId)) {
+      throw ApiError.badRequest("Invalid cart item id");
+    }
     const result = await cartService.removeFromCart(cartItemId, customerId);
     return ApiResponse.success(res, result.message);
   } catch (error) {

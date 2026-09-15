@@ -160,6 +160,37 @@ export const ordersApi = {
   cancel: (id) => client.patch(`/api/v1/orders/${id}/cancel`),
 };
 
+// ---------- Payments (Razorpay) ----------
+export const paymentsApi = {
+  createOrder: (orderId) => client.post(`/api/v1/payments/orders/${orderId}/create`),
+  verify: (payload) => client.post("/api/v1/payments/verify", payload),
+};
+
+// The backend also confirms payment asynchronously via a Razorpay webhook,
+// which can land a few seconds after the checkout modal closes (or after a
+// browser-side /verify call fails on a flaky connection) even though the
+// charge itself went through. Before telling the customer a payment failed,
+// give the webhook a short window to land and re-check the order instead of
+// trusting only the synchronous, browser-side outcome.
+export async function waitForPaymentStatus(orderId, options) {
+  const attempts = (options && options.attempts) || 4;
+  const delayMs = (options && options.delayMs) || 1500;
+
+  for (let i = 0; i < attempts; i++) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
+      const res = await ordersApi.get(orderId);
+      if (res.data && res.data.paymentStatus === "paid") {
+        return res.data;
+      }
+    } catch (err) {
+      // Ignore and keep polling: a transient fetch error here shouldn't stop
+      // us from finding out the payment actually went through.
+    }
+  }
+  return null;
+}
+
 // ---------- Ratings ----------
 // Requires ratings.routes.js to be mounted in app.js (see setup notes).
 export const ratingsApi = {

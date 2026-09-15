@@ -153,10 +153,10 @@ const cancelOrderService = async (orderId, customerId) => {
     const items = await db
       .select({
         sellerId: orderItems.sellerId,
-        serviceName: services.serviceName,
+        serviceName: service.serviceName,
       })
       .from(orderItems)
-      .leftJoin(services, eq(orderItems.serviceId, services.id))
+      .leftJoin(service, eq(orderItems.serviceId, service.id))
       .where(eq(orderItems.orderId, numericOrderId));
 
     for (const item of items) {
