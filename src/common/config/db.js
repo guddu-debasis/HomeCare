@@ -14,9 +14,10 @@ const pool = new pg.Pool({
 });
 
 // Supabase pooler may use a different search_path — force public on every connection
-pool.on('connect', (client) => {
-  client.query('SET search_path TO public');
+pool.on('connect', async (client) => {
+  await client.query('SET search_path TO public');
 });
+
 
 // Without this, an error on an idle pooled connection (e.g. the DB dropping
 // it) becomes an unhandled 'error' event and can crash the process outside
