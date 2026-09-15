@@ -5,9 +5,12 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon server.js",
+    "start": "node server.js",
     "db:migrate": "drizzle-kit migrate",
-    "db:generate": "drizzle-kit generate",
-    "postinstall": "prisma skills sync || exit 0"
+    "db:generate": "drizzle-kit generate"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "keywords": [],
   "author": "",
