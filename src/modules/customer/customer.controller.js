@@ -71,6 +71,16 @@ const fetchCustomerNotifications = async (req, res, next) => {
     }
 };
 
+const fetchUnreadCount = async (req, res, next) => {
+    try {
+        const customerId = req.user.id;
+        const count = await customerService.getUnreadCount(customerId);
+        return ApiResponse.success(res, "Unread count retrieved successfully", { count });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const markCustomerNotificationRead = async (req, res, next) => {
     try {
         const customerId = req.user.id;
@@ -98,6 +108,7 @@ export default {
     forgotPassword,
     resetPassword,
     logoutCustomer,
+    fetchUnreadCount,
     refreshToken,
     fetchCustomerNotifications,
     markCustomerNotificationRead,

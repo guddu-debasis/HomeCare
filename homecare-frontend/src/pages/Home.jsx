@@ -95,6 +95,11 @@ export default function Home() {
   const [selectedService, setSelectedService] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [addingServiceId, setAddingServiceId] = useState(null);
+  // Tracks the specific provider button being clicked inside the modal
+  // (keyed by sellerId, or "base" for the no-provider fallback button) so
+  // that clicking one "Book with Pro" button doesn't show every sibling
+  // provider's button as loading too.
+  const [addingProviderKey, setAddingProviderKey] = useState(null);
 
   // FAQ open item
   const [openFaq, setOpenFaq] = useState(0);
@@ -176,6 +181,7 @@ export default function Home() {
     }
 
     setAddingServiceId(service.id);
+    setAddingProviderKey(provider ? provider.sellerId : "base");
     try {
       await cartApi.add({
         serviceId: service.id,
@@ -195,6 +201,7 @@ export default function Home() {
       showError(err.message || "Failed to add service to cart.");
     } finally {
       setAddingServiceId(null);
+      setAddingProviderKey(null);
     }
   };
 
@@ -889,11 +896,11 @@ export default function Home() {
                   </p>
                   <button
                     type="button"
-                    disabled={addingServiceId === selectedService.id}
+                    disabled={addingProviderKey === "base"}
                     onClick={() => handleAddToCart(selectedService)}
                     className={`${btnPrimary} w-full py-2.5 text-xs`}
                   >
-                    {addingServiceId === selectedService.id ? "Adding..." : "Add to Cart at Base Price"}
+                    {addingProviderKey === "base" ? "Adding..." : "Add to Cart at Base Price"}
                   </button>
                 </div>
               ) : (
@@ -920,11 +927,11 @@ export default function Home() {
 
                       <button
                         type="button"
-                        disabled={addingServiceId === selectedService.id}
+                        disabled={addingProviderKey === prov.sellerId}
                         onClick={() => handleAddToCart(selectedService, prov)}
                         className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400 transition-colors shadow-sm disabled:opacity-50"
                       >
-                        {addingServiceId === selectedService.id ? "Adding..." : "Book with Pro"}
+                        {addingProviderKey === prov.sellerId ? "Adding..." : "Book with Pro"}
                       </button>
                     </div>
                   ))}

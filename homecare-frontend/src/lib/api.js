@@ -146,10 +146,51 @@ export const sellerServicesApi = {
 };
 
 // ---------- Cart ----------
+// Fires a plain DOM event whenever the cart changes so the navbar badge (or
+// anything else) can refresh instantly instead of waiting for the next
+// route change to happen to re-fetch it. Optionally carries a known count
+// so listeners can skip an extra round trip when the caller already knows
+// the new total (e.g. the Cart page itself, after loading its full list).
+const CART_CHANGED_EVENT = "homecare:cart-changed";
+function notifyCartChanged(knownCount) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(CART_CHANGED_EVENT, { detail: { count: knownCount } })
+    );
+  }
+}
+
 export const cartApi = {
   list: () => client.get("/app/v1/cart"),
-  add: (payload) => client.post("/app/v1/cart", payload),
-  remove: (cartItemId) => client.delete(`/app/v1/cart/${cartItemId}`),
+  // Cheap Redis-only count for UI chrome (navbar badge) — avoids the full
+  // enriched list() round trip (which also joins Postgres) just to show a
+  // number.
+  count: () => client.get("/app/v1/cart/count"),
+  // Lets a page that already fetched the full list (e.g. Cart.jsx) tell the
+  // navbar the new count directly, instead of the navbar firing its own
+  // redundant /cart/count request at the same moment.
+  announceCount: (count) => notifyCartChanged(count),
+  add: (payload) =>
+    client.post("/app/v1/cart", payload).then((res) => {
+      notifyCartChanged();
+      return res;
+    }),
+  // Hot path for a quantity +/- stepper, if/when one is added here — hits
+  // Redis only on the backend, no DB round trip.
+  increment: (serviceId, sellerId, delta) =>
+    client.patch("/app/v1/cart/increment", { serviceId, sellerId, delta }).then((res) => {
+      notifyCartChanged();
+      return res;
+    }),
+  // knownCount is optional: pass it when the caller already knows the new
+  // total (Cart.jsx does, from its own local list) so the navbar can use it
+  // directly instead of firing its own /cart/count request right after.
+  remove: (serviceId, sellerId, knownCount) =>
+    client.delete(`/app/v1/cart/${serviceId}/${sellerId}`).then((res) => {
+      notifyCartChanged(knownCount);
+      return res;
+    }),
+  CART_CHANGED_EVENT,
 };
 
 // ---------- Orders ----------
@@ -208,6 +249,7 @@ export const sellerBookingsApi = {
 // ---------- Seller Notifications ----------
 export const sellerNotificationsApi = {
   list: () => client.get("/app/v1/seller/notifications"),
+  unreadCount: () => client.get("/app/v1/seller/notifications/unread-count"),
   markRead: (id) => client.patch(`/app/v1/seller/notifications/${id}/read`),
   markAllRead: () => client.patch("/app/v1/seller/notifications/read-all"),
 };
@@ -215,6 +257,7 @@ export const sellerNotificationsApi = {
 // ---------- Customer Notifications ----------
 export const customerNotificationsApi = {
   list: () => client.get("/app/v1/customer/notifications"),
+  unreadCount: () => client.get("/app/v1/customer/notifications/unread-count"),
   markRead: (id) => client.patch(`/app/v1/customer/notifications/${id}/read`),
   markAllRead: () => client.patch("/app/v1/customer/notifications/read-all"),
 };

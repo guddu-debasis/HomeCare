@@ -1,8 +1,10 @@
 import { db } from "../../common/config/db.js";
-import { orderBooking, orderItems, cartItems, service, sellerService, notifications, customers } from "../../db/schema.js";
+import { orderBooking, orderItems, service, notifications, customers } from "../../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import ApiError from "../../common/utils/api-error.js";
 import razorpay from "../../common/config/razorpay.js";
+import { redis } from "../../common/config/redis.js";
+import * as cartService from "../cart/cart.service.js";
 
 const createOrder = async ({ customerId, bookingDate }) => {
   // Joi.date().iso() coerces the incoming string into a JS Date object.
@@ -13,26 +15,10 @@ const createOrder = async ({ customerId, bookingDate }) => {
       ? bookingDate.toISOString().split("T")[0]
       : String(bookingDate).split("T")[0];
 
-  // 1. Fetch items from the customer's cart with prices
-  const itemsInCart = await db
-    .select({
-      serviceId: cartItems.serviceId,
-      serviceName: service.serviceName,
-      sellerId: cartItems.sellerId,
-      quantity: cartItems.quantity,
-      basePrice: service.basePrice,
-      customPrice: sellerService.customPrice,
-    })
-    .from(cartItems)
-    .innerJoin(service, eq(cartItems.serviceId, service.id))
-    .leftJoin(
-      sellerService,
-      and(
-        eq(sellerService.sellerId, cartItems.sellerId),
-        eq(sellerService.serviceId, cartItems.serviceId)
-      )
-    )
-    .where(eq(cartItems.customerId, customerId));
+  // 1. Read the live cart out of Redis (already enriched with current
+  // service/seller pricing — see cart.service.js). This is the one point
+  // where the cart touches Postgres at all pre-checkout.
+  const itemsInCart = await cartService.getCartItems(customerId);
 
   if (!itemsInCart || itemsInCart.length === 0) {
     throw ApiError.badRequest("Cart is empty. Cannot create an order.");
@@ -41,7 +27,7 @@ const createOrder = async ({ customerId, bookingDate }) => {
   // 2. Calculate total amount and prepare order items data
   let totalAmount = 0;
   const processedItems = itemsInCart.map((item) => {
-    const price = Number(item.customPrice ?? item.basePrice);
+    const price = Number(item.price);
     const itemTotal = price * item.quantity;
     totalAmount += itemTotal;
 
@@ -92,13 +78,17 @@ const createOrder = async ({ customerId, bookingDate }) => {
         link: "/seller/services",
         isRead: false,
       });
+      await redis.incr(`unread:seller:${item.sellerId}`);
     }
-
-    // Clear the customer's cart
-    await tx.delete(cartItems).where(eq(cartItems.customerId, customerId));
 
     return booking;
   });
+
+  // 4. Order committed — now it's safe to clear the Redis cart. Redis isn't
+  // part of the Postgres transaction above (it can't be), so this only runs
+  // once we know the order actually committed — if checkout fails partway
+  // through, the customer's cart is untouched rather than silently lost.
+  await cartService.clearCart(customerId);
 
   return newOrder;
 };
@@ -198,6 +188,7 @@ const cancelOrderService = async (orderId, customerId) => {
           link: "/seller/services",
           isRead: false,
         });
+        await redis.incr(`unread:seller:${item.sellerId}`);
       }
     }
 
@@ -215,6 +206,7 @@ const cancelOrderService = async (orderId, customerId) => {
         link: "/customer/orders",
         isRead: false,
       });
+      await redis.incr(`unread:customer:${customerId}`);
     }
   } catch (notifErr) {
     console.error("Failed to create cancellation notifications:", notifErr);

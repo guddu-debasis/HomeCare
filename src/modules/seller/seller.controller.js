@@ -100,6 +100,16 @@ const fetchSellerNotifications = async (req, res, next) => {
     }
 };
 
+const fetchUnreadCount = async (req, res, next) => {
+    try {
+        const sellerId = req.user.id;
+        const count = await sellerService.getUnreadCount(sellerId);
+        return ApiResponse.success(res, "Unread count retrieved successfully", { count });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const markSellerNotificationRead = async (req, res, next) => {
     try {
         const sellerId = req.user.id;
@@ -131,6 +141,7 @@ export {
     fetchSellerBookings,
     updateSellerBookingStatus,
     fetchSellerNotifications,
+    fetchUnreadCount,
     markSellerNotificationRead,
     markAllSellerNotificationsRead,
 };

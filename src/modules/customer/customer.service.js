@@ -11,6 +11,7 @@ import bcrypt from "bcrypt";
 import { customers, notifications } from "../../db/schema.js";
 import { db } from "../../common/config/db.js";
 import { eq, and, desc } from "drizzle-orm";
+import { redis } from "../../common/config/redis.js";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -195,21 +196,56 @@ const getCustomerNotifications = async (customerId) => {
     .orderBy(desc(notifications.createdAt));
 };
 
+const UNREAD_TTL = 60 * 60;
+
+// New: cheap, Redis-backed. This is what the 20s poll should call instead of
+// getCustomerNotifications above.
+const getUnreadCount = async (customerId) => {
+  const cacheKey = `unread:customer:${customerId}`;
+  const cached = await redis.get(cacheKey);
+  if (cached !== null) {
+    return Number(cached);
+  }
+
+  const rows = await db
+    .select({ id: notifications.id })
+    .from(notifications)
+    .where(and(eq(notifications.customerId, Number(customerId)), eq(notifications.isRead, false)));
+  const count = rows.length;
+
+  await redis.set(cacheKey, count, { ex: UNREAD_TTL });
+  return count;
+};
+
 const markNotificationRead = async (customerId, notificationId) => {
-  const [updated] = await db
-    .update(notifications)
-    .set({ isRead: true })
+  // Check prior state first so we only decrement Redis when this notification
+  // actually flips from unread → read (keeps the counter accurate even if the
+  // same notification is clicked twice).
+  const [existing] = await db
+    .select()
+    .from(notifications)
     .where(
       and(
         eq(notifications.id, Number(notificationId)),
         eq(notifications.customerId, Number(customerId))
       )
     )
-    .returning();
+    .limit(1);
 
-  if (!updated) {
+  if (!existing) {
     throw ApiError.notFound("Notification not found");
   }
+
+  const [updated] = await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.id, Number(notificationId)))
+    .returning();
+
+  if (!existing.isRead) {
+    await redis.decr(`unread:customer:${customerId}`);
+  }
+
   return updated;
 };
 
@@ -218,6 +254,8 @@ const markAllNotificationsRead = async (customerId) => {
     .update(notifications)
     .set({ isRead: true })
     .where(eq(notifications.customerId, Number(customerId)));
+
+  await redis.set(`unread:customer:${customerId}`, 0);
 
   return { message: "All notifications marked as read" };
 };
@@ -230,6 +268,7 @@ export {
   forgotPassword,
   resetPassword,
   getCustomerNotifications,
+  getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
 };

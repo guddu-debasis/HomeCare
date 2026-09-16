@@ -23,10 +23,22 @@ export default function NotificationBell({ role = "seller" }) {
   const defaultLink = role === "customer" ? "/orders" : "/seller/services";
   const defaultLinkLabel = role === "customer" ? "View My Bookings →" : "View Service Offerings & Orders →";
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await notificationsApi.unreadCount();
+      if (res && res.data) {
+        setUnreadCount(res.data.count);
+      }
+    } catch (err) {
+      console.error(`Failed to fetch ${role} unread count:`, err);
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -40,12 +52,20 @@ export default function NotificationBell({ role = "seller" }) {
   };
 
   useEffect(() => {
-    fetchNotifications();
-    // Poll every 20 seconds for real-time incoming orders & messages
-    const interval = setInterval(fetchNotifications, 20000);
+    fetchUnreadCount();
+    // Poll only the cheap unread-count endpoint every 20 seconds — the full
+    // list is only fetched when the dropdown is actually opened (see below).
+    const interval = setInterval(fetchUnreadCount, 20000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -62,8 +82,6 @@ export default function NotificationBell({ role = "seller" }) {
     };
   }, [isOpen]);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
   const handleMarkAllRead = async () => {
     setLoading(true);
     try {
@@ -71,6 +89,7 @@ export default function NotificationBell({ role = "seller" }) {
       setNotifications((prev) =>
         prev.map((item) => ({ ...item, isRead: true }))
       );
+      setUnreadCount(0);
     } catch (err) {
       console.error("Failed to mark all as read:", err);
     } finally {
@@ -87,6 +106,7 @@ export default function NotificationBell({ role = "seller" }) {
             item.id === notif.id ? { ...item, isRead: true } : item
           )
         );
+        setUnreadCount((c) => Math.max(0, c - 1));
       } catch (err) {
         console.error("Failed to mark notification as read:", err);
       }

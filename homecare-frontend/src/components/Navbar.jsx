@@ -24,19 +24,45 @@ export default function Navbar() {
 
   const closeMenu = () => setMenuOpen(false);
 
-  // Fetch cart count when customer is authenticated
+  // Fetch cart count when customer is authenticated. Uses the cheap
+  // Redis-only /cart/count endpoint (not the full enriched cart list), and
+  // refreshes both on navigation and immediately whenever cartApi fires a
+  // "cart changed" event (add/remove/increment) so the badge doesn't wait
+  // for the next route change to catch up.
   useEffect(() => {
-    if (isAuthenticated && role === "customer") {
-      cartApi
-        .list()
-        .then((res) => {
-          const items = res.data || [];
-          setCartCount(items.length);
-        })
-        .catch(() => setCartCount(0));
-    } else {
+    if (!(isAuthenticated && role === "customer")) {
       setCartCount(0);
+      return;
     }
+
+    const refreshCount = () => {
+      cartApi
+        .count()
+        .then((res) => setCartCount(res.data?.count || 0))
+        .catch(() => setCartCount(0));
+    };
+
+    const handleCartChanged = (e) => {
+      // If the event already carries the new count (Cart.jsx announces it
+      // after loading its own full list), just use that instead of firing a
+      // second, redundant /cart/count request at the same moment.
+      if (e?.detail?.count !== undefined && e.detail.count !== null) {
+        setCartCount(e.detail.count);
+      } else {
+        refreshCount();
+      }
+    };
+
+    // The Cart page loads the full enriched list itself and announces the
+    // count from that response (see Cart.jsx) — fetching it here too would
+    // just be a second request competing for the same backend at the same
+    // moment right when the page already feels busiest.
+    if (!location.pathname.startsWith("/cart")) {
+      refreshCount();
+    }
+
+    window.addEventListener(cartApi.CART_CHANGED_EVENT, handleCartChanged);
+    return () => window.removeEventListener(cartApi.CART_CHANGED_EVENT, handleCartChanged);
   }, [isAuthenticated, role, location.pathname]);
 
   const handleLogout = async () => {

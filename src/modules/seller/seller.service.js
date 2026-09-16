@@ -11,6 +11,7 @@ import bcrypt from "bcrypt";
 import { seller, orderBooking, orderItems, service, customers, notifications } from "../../db/schema.js";
 import { db } from "../../common/config/db.js";
 import { eq, and, desc } from "drizzle-orm";
+import { redis } from "../../common/config/redis.js";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -225,6 +226,8 @@ const updateBookingStatus = async (sellerId, bookingId, status) => {
       link: `/orders/${numericBookingId}`,
       isRead: false,
     });
+
+    await redis.incr(`unread:customer:${updated.customerId}`);
   }
 
   return updated;
@@ -265,6 +268,8 @@ const resetPassword = async (token, newPassword) => {
   return { message: "Password reset successfully. You can now log in with your new password." };
 };
 
+const UNREAD_TTL = 60 * 60; // 1hr safety net — the counter is kept in sync explicitly on writes below
+
 const getSellerNotifications = async (sellerId) => {
   return await db
     .select()
@@ -273,21 +278,51 @@ const getSellerNotifications = async (sellerId) => {
     .orderBy(desc(notifications.createdAt));
 };
 
+// Cheap, Redis-backed. This is what the 20s poll should call instead of
+// getSellerNotifications above.
+const getUnreadCount = async (sellerId) => {
+  const cacheKey = `unread:seller:${sellerId}`;
+  const cached = await redis.get(cacheKey);
+  if (cached !== null) {
+    return Number(cached);
+  }
+
+  const rows = await db
+    .select({ id: notifications.id })
+    .from(notifications)
+    .where(and(eq(notifications.sellerId, Number(sellerId)), eq(notifications.isRead, false)));
+  const count = rows.length;
+
+  await redis.set(cacheKey, count, { ex: UNREAD_TTL });
+  return count;
+};
+
 const markNotificationRead = async (sellerId, notificationId) => {
-  const [updated] = await db
-    .update(notifications)
-    .set({ isRead: true })
+  const [existing] = await db
+    .select()
+    .from(notifications)
     .where(
       and(
         eq(notifications.id, Number(notificationId)),
         eq(notifications.sellerId, Number(sellerId))
       )
     )
-    .returning();
+    .limit(1);
 
-  if (!updated) {
+  if (!existing) {
     throw ApiError.notFound("Notification not found");
   }
+
+  const [updated] = await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.id, Number(notificationId)))
+    .returning();
+
+  if (!existing.isRead) {
+    await redis.decr(`unread:seller:${sellerId}`);
+  }
+
   return updated;
 };
 
@@ -296,6 +331,8 @@ const markAllNotificationsRead = async (sellerId) => {
     .update(notifications)
     .set({ isRead: true })
     .where(eq(notifications.sellerId, Number(sellerId)));
+
+  await redis.set(`unread:seller:${sellerId}`, 0);
 
   return { message: "All notifications marked as read" };
 };
@@ -310,6 +347,7 @@ export {
   getSellerBookings,
   updateBookingStatus,
   getSellerNotifications,
+  getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
 };

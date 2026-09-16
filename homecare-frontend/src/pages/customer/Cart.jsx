@@ -20,7 +20,14 @@ export default function Cart() {
     setLoading(true);
     cartApi
       .list()
-      .then((res) => setItems(res.data || []))
+      .then((res) => {
+        const loadedItems = res.data || [];
+        setItems(loadedItems);
+        // Let the navbar badge know the count directly from this response,
+        // instead of it firing its own separate /cart/count request at the
+        // same moment this page is already loading the full list.
+        cartApi.announceCount(loadedItems.length);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   };
@@ -33,12 +40,20 @@ export default function Cart() {
     setBookingDate(tomorrow.toISOString().split("T")[0]);
   }, []);
 
-  const removeItem = async (id) => {
+  const removeItem = async (item) => {
+    // Optimistic removal: drop it from the visible list immediately so the
+    // click feels instant, then confirm with the backend in the background.
+    // Roll back (and re-show the error) if the request actually fails.
+    const previousItems = items;
+    const nextItems = items.filter((i) => i.id !== item.id);
+    setItems(nextItems);
     try {
-      await cartApi.remove(id);
+      // Passing nextItems.length lets cartApi.remove announce the new count
+      // to the navbar directly, instead of a second /cart/count request.
+      await cartApi.remove(item.serviceId, item.sellerId, nextItems.length);
       showSuccess("Item removed from cart.");
-      setItems((prev) => prev.filter((i) => i.id !== id));
     } catch (err) {
+      setItems(previousItems);
       showError(err.message || "Failed to remove item.");
     }
   };
@@ -228,7 +243,7 @@ export default function Cart() {
                         </span>
 
                         <button
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => removeItem(item)}
                           className="rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
                           title="Remove item"
                         >
