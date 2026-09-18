@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { cartApi, ordersApi, paymentsApi, waitForPaymentStatus } from "../../lib/api";
+import { loadRazorpayScript } from "../../lib/loadRazorpay";
 import { formatMoney } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
 import { btnPrimary, btnSecondary, input } from "../../lib/ui";
@@ -38,6 +39,10 @@ export default function Cart() {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     setBookingDate(tomorrow.toISOString().split("T")[0]);
+    // Prefetch Razorpay's checkout.js in the background while the customer
+    // is still reviewing their cart, so clicking "Confirm & Pay" doesn't
+    // have to wait on it. Fire-and-forget; handleCheckout re-checks it.
+    loadRazorpayScript();
   }, []);
 
   const removeItem = async (item) => {
@@ -107,7 +112,11 @@ export default function Cart() {
         return;
       }
 
-      if (!window.Razorpay) {
+      // Fetched on demand — not preloaded on every page (see index.html) —
+      // so kick this off in parallel with the payment-order creation above
+      // rather than waiting for it first.
+      const razorpayReady = await loadRazorpayScript();
+      if (!razorpayReady || !window.Razorpay) {
         showError("Payment gateway failed to load. You can pay from your booking page.");
         navigate(`/orders/${bookingId}`);
         return;

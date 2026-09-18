@@ -1,14 +1,66 @@
 @import "tailwindcss";
 
+/* ============================================================
+   HEARTH BRAND PALETTE
+   Warm, home-and-craft rooted palette instead of the generic
+   cool-charcoal + gold-amber "SaaS dashboard" look. Built around
+   the brand name itself: a hearth is warmth, gathering, home.
+   Replacing Tailwind's default slate/amber/emerald scales here
+   recolors the entire app — every bg-slate-950, text-amber-400,
+   border-emerald-500/30 etc. across every page picks this up
+   automatically, with nothing else needing to change.
+   ============================================================ */
 @theme {
-  --color-emerald-deep: #064e3b;
-  --color-emerald-primary: #059669;
-  --color-emerald-light: #ecfdf5;
-  --color-amber-gold: #d97706;
-  --color-amber-light: #fffbeb;
-  --color-slate-dark: #0f172a;
-  --color-slate-card: #1e293b;
-  --color-slate-border: #334155;
+  /* Neutral scale — warm charcoal/stone instead of cool blue-grey */
+  --color-slate-50: #faf6f0;
+  --color-slate-100: #f5eee4;
+  --color-slate-200: #e8ddcc;
+  --color-slate-300: #d3c3ac;
+  --color-slate-400: #b3a088;
+  --color-slate-500: #8f7c68;
+  --color-slate-600: #6e5d4c;
+  --color-slate-700: #524437;
+  --color-slate-800: #362c23;
+  --color-slate-900: #241d17;
+  --color-slate-950: #17130f;
+
+  /* Primary accent — "Ember": warm burnt copper-orange instead of
+     stock gold-amber. Used for CTAs, prices, highlights. */
+  --color-amber-50: #fdf3ec;
+  --color-amber-100: #fae3d1;
+  --color-amber-200: #f3c6a3;
+  --color-amber-300: #eaa170;
+  --color-amber-400: #de7c48;
+  --color-amber-500: #c9592a;
+  --color-amber-600: #a8451f;
+  --color-amber-700: #85351a;
+  --color-amber-800: #632918;
+  --color-amber-900: #431e14;
+  --color-amber-950: #26120c;
+
+  /* Secondary accent — "Sage": muted forest green instead of neon
+     SaaS-emerald. Used for verified/trust/success states. */
+  --color-emerald-50: #f1f6f1;
+  --color-emerald-100: #dfebdf;
+  --color-emerald-200: #bbd6bc;
+  --color-emerald-300: #93bc96;
+  --color-emerald-400: #6c9e71;
+  --color-emerald-500: #4f7f55;
+  --color-emerald-600: #3d6642;
+  --color-emerald-700: #315136;
+  --color-emerald-800: #28402b;
+  --color-emerald-900: #213423;
+  --color-emerald-950: #101d12;
+
+  /* Legacy named tokens some components may reference directly */
+  --color-emerald-deep: #213423;
+  --color-emerald-primary: #4f7f55;
+  --color-emerald-light: #f1f6f1;
+  --color-amber-gold: #c9592a;
+  --color-amber-light: #fdf3ec;
+  --color-slate-dark: #17130f;
+  --color-slate-card: #241d17;
+  --color-slate-border: #524437;
 
   --font-display: "Plus Jakarta Sans", sans-serif;
   --font-sans: "Inter", sans-serif;
@@ -20,8 +72,8 @@
   }
 
   body {
-    background-color: #0b132b;
-    color: #f8fafc;
+    background-color: #17130f;
+    color: #f5eee4;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -36,24 +88,26 @@
   }
 }
 
-/* Light Mode Theme Overrides */
+/* Light Mode Theme Overrides — warm linen instead of cool blue-white,
+   so toggling to light mode stays on-brand rather than reverting to a
+   generic light SaaS look. */
 html.light {
   color-scheme: light;
-  --color-slate-950: #f8fafc;
-  --color-slate-900: #ffffff;
-  --color-slate-800: #f1f5f9;
-  --color-slate-700: #e2e8f0;
-  --color-slate-600: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-400: #475569;
-  --color-slate-300: #334155;
-  --color-slate-200: #1e293b;
-  --color-slate-100: #0f172a;
+  --color-slate-950: #faf6f0;
+  --color-slate-900: #fffcf8;
+  --color-slate-800: #f2e9dc;
+  --color-slate-700: #e4d8c5;
+  --color-slate-600: #a99a87;
+  --color-slate-500: #8f7c68;
+  --color-slate-400: #6e5d4c;
+  --color-slate-300: #524437;
+  --color-slate-200: #362c23;
+  --color-slate-100: #241d17;
 }
 
 html.light body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #faf6f0;
+  color: #241d17;
 }
 
 html.light h1,
@@ -62,11 +116,11 @@ html.light h3,
 html.light h4,
 html.light h5,
 html.light h6 {
-  color: #0f172a;
+  color: #241d17;
 }
 
 html.light .bg-slate-950 {
-  background-color: #f8fafc !important;
+  background-color: #faf6f0 !important;
 }
 
 html.light .bg-slate-900,
@@ -76,86 +130,86 @@ html.light .bg-slate-900\/60,
 html.light .bg-slate-900\/70,
 html.light .bg-slate-900\/80,
 html.light .bg-slate-900\/90 {
-  background-color: #ffffff !important;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  background-color: #fffcf8 !important;
+  box-shadow: 0 4px 20px -2px rgba(36, 29, 23, 0.06);
 }
 
 html.light .bg-slate-800,
 html.light .bg-slate-800\/60 {
-  background-color: #f1f5f9 !important;
+  background-color: #f2e9dc !important;
 }
 
 html.light .bg-slate-950\/50,
 html.light .bg-slate-950\/60,
 html.light .bg-slate-950\/75,
 html.light .bg-slate-950\/80 {
-  background-color: rgba(248, 250, 252, 0.95) !important;
+  background-color: rgba(250, 246, 240, 0.95) !important;
 }
 
 html.light .border-slate-800,
 html.light .border-slate-800\/80,
 html.light .border-slate-800\/50 {
-  border-color: #e2e8f0 !important;
+  border-color: #e4d8c5 !important;
 }
 
 html.light .border-slate-700 {
-  border-color: #cbd5e1 !important;
+  border-color: #d3c3ac !important;
 }
 
 html.light .text-slate-100 {
-  color: #0f172a !important;
+  color: #241d17 !important;
 }
 
 html.light .text-slate-200 {
-  color: #1e293b !important;
+  color: #362c23 !important;
 }
 
 html.light .text-slate-300 {
-  color: #334155 !important;
+  color: #524437 !important;
 }
 
 html.light .text-slate-400 {
-  color: #475569 !important;
+  color: #6e5d4c !important;
 }
 
 html.light .text-white:not(.btn-primary *):not(.bg-amber-500 *):not(.bg-emerald-500 *):not(.bg-blue-500 *):not(.bg-red-500 *) {
-  color: #0f172a !important;
+  color: #241d17 !important;
 }
 
 html.light input,
 html.light textarea,
 html.light select {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  background-color: #fffcf8 !important;
+  color: #241d17 !important;
+  border-color: #d3c3ac !important;
 }
 
 html.light input::placeholder,
 html.light textarea::placeholder {
-  color: #94a3b8 !important;
+  color: #a99a87 !important;
 }
 
 html.light .btn-secondary {
-  background: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
-  color: #1e293b !important;
+  background: #f2e9dc !important;
+  border-color: #e4d8c5 !important;
+  color: #362c23 !important;
 }
 
 html.light .btn-secondary:hover {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
+  background: #e4d8c5 !important;
+  color: #241d17 !important;
 }
 
 /* Custom Component Utilities */
 .glass-panel {
-  background: rgba(30, 41, 59, 0.7);
+  background: rgba(54, 44, 35, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.6);
+  background: rgba(54, 44, 35, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -163,32 +217,32 @@ html.light .btn-secondary:hover {
 }
 
 .glass-card:hover {
-  border-color: rgba(217, 119, 6, 0.4);
+  border-color: rgba(201, 89, 42, 0.4);
   transform: translateY(-3px);
-  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5), 0 0 20px -5px rgba(217, 119, 6, 0.15);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5), 0 0 20px -5px rgba(201, 89, 42, 0.15);
 }
 
 .glass-input {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(23, 19, 15, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f8fafc;
+  color: #f5eee4;
   transition: all 0.2s ease;
 }
 
 .glass-input:focus {
   outline: none;
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+  border-color: #de7c48;
+  box-shadow: 0 0 0 3px rgba(222, 124, 72, 0.2);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  background: linear-gradient(135deg, #c9592a 0%, #85351a 100%);
   color: #ffffff;
   font-weight: 600;
   border-radius: 0.75rem;
   padding: 0.625rem 1.25rem;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 14px 0 rgba(217, 119, 6, 0.35);
+  box-shadow: 0 4px 14px 0 rgba(201, 89, 42, 0.35);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -196,9 +250,9 @@ html.light .btn-secondary:hover {
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: linear-gradient(135deg, #de7c48 0%, #c9592a 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px 0 rgba(217, 119, 6, 0.45);
+  box-shadow: 0 6px 20px 0 rgba(201, 89, 42, 0.45);
 }
 
 .btn-primary:disabled {
@@ -210,7 +264,7 @@ html.light .btn-secondary:hover {
 .btn-secondary {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #f8fafc;
+  color: #f5eee4;
   font-weight: 500;
   border-radius: 0.75rem;
   padding: 0.625rem 1.25rem;
@@ -228,18 +282,18 @@ html.light .btn-secondary:hover {
 }
 
 .btn-emerald {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  background: linear-gradient(135deg, #4f7f55 0%, #315136 100%);
   color: #ffffff;
   font-weight: 600;
   border-radius: 0.75rem;
   padding: 0.625rem 1.25rem;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 14px 0 rgba(5, 150, 105, 0.35);
+  box-shadow: 0 4px 14px 0 rgba(79, 127, 85, 0.35);
 }
 
 .btn-emerald:hover {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 6px 20px 0 rgba(5, 150, 105, 0.45);
+  background: linear-gradient(135deg, #6c9e71 0%, #4f7f55 100%);
+  box-shadow: 0 6px 20px 0 rgba(79, 127, 85, 0.45);
 }
 
 /* Animations */
@@ -268,14 +322,14 @@ html.light .btn-secondary:hover {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #241d17;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #524437;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #6e5d4c;
 }

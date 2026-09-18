@@ -5,13 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Hearth - Professional Home Care Services & Local Provider Booking Platform" />
+    <meta name="theme-color" content="#17130f" />
     <title>Hearth — Premier Local Home Care & Maintenance Services</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- Razorpay's checkout.js is intentionally NOT loaded here. It's only
+         needed on the Cart page's checkout button, and loading a third-party
+         script synchronously on every page (Home, Login, etc.) taxes every
+         visit for a feature most visits never use. It's loaded on demand
+         instead — see src/lib/loadRazorpay.js. -->
   </head>
-  <body className="bg-slate-900 text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-900">
+  <body className="bg-slate-950 text-slate-100 antialiased selection:bg-amber-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
