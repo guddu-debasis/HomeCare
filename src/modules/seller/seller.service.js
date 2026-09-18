@@ -12,6 +12,8 @@ import { seller, orderBooking, orderItems, service, customers, notifications } f
 import { db } from "../../common/config/db.js";
 import { eq, and, desc } from "drizzle-orm";
 import { redis } from "../../common/config/redis.js";
+import { deriveOverallOrderStatus } from "../../common/utils/order-status.util.js";
+import razorpay from "../../common/config/razorpay.js";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -164,7 +166,12 @@ const getSellerBookings = async (sellerId) => {
       customerPhone: customers.phNo,
       customerLocation: customers.currLocation,
       bookingDate: orderBooking.bookingDate,
-      status: orderBooking.status,
+      // This seller's own line status — what this seller can actually see
+      // and act on. NOT orderBooking.status, which is a rollup across every
+      // seller in the (possibly combined) order and would show this seller
+      // someone else's rejection as if it were their own.
+      status: orderItems.status,
+      orderOverallStatus: orderBooking.status,
       paymentStatus: orderBooking.paymentStatus,
       totalAmount: orderBooking.totalAmount,
       createdAt: orderBooking.createdAt,
@@ -182,55 +189,143 @@ const getSellerBookings = async (sellerId) => {
     .orderBy(desc(orderBooking.bookingDate), desc(orderBooking.createdAt));
 };
 
-const updateBookingStatus = async (sellerId, bookingId, status) => {
+// `orderItemId` is this seller's specific Order_Items row — NOT the parent
+// order id. Updating status here only ever touches this seller's own line;
+// the parent order's status is then recomputed as a rollup of every item
+// (see order-status.util.js), so one seller accepting/declining their job
+// can never flip the order for other sellers or the customer's other items.
+const updateBookingStatus = async (sellerId, orderItemId, status) => {
   const numericSellerId = Number(sellerId);
-  const numericBookingId = Number(bookingId);
+  const numericItemId = Number(orderItemId);
 
-  // Verify that this booking contains an item belonging to this seller
+  // Verify this order item actually belongs to this seller
   const [item] = await db
     .select({
+      id: orderItems.id,
+      orderId: orderItems.orderId,
       serviceId: orderItems.serviceId,
       serviceName: service.serviceName,
+      status: orderItems.status,
+      price: orderItems.price,
+      quantity: orderItems.quantity,
     })
     .from(orderItems)
     .innerJoin(service, eq(orderItems.serviceId, service.id))
-    .where(and(eq(orderItems.orderId, numericBookingId), eq(orderItems.sellerId, numericSellerId)))
+    .where(and(eq(orderItems.id, numericItemId), eq(orderItems.sellerId, numericSellerId)))
     .limit(1);
 
   if (!item) {
     throw ApiError.notFound("Booking not found or not assigned to you");
   }
 
-  const [updated] = await db
-    .update(orderBooking)
-    .set({
-      status,
-      updatedAt: new Date(),
+  // Guard against re-triggering an already-final status — besides being
+  // nonsensical (un-completing a finished job), without this a seller could
+  // call "cancelled" on the same item twice and, once refunds are involved
+  // below, trigger a duplicate refund.
+  if (item.status === "completed" || item.status === "cancelled") {
+    throw ApiError.badRequest(`This item is already ${item.status} and can't be updated further.`);
+  }
+
+  const [orderRow] = await db
+    .select({
+      customerId: orderBooking.customerId,
+      paymentStatus: orderBooking.paymentStatus,
+      razorpayPaymentId: orderBooking.razorpayPaymentId,
     })
-    .where(eq(orderBooking.id, numericBookingId))
+    .from(orderBooking)
+    .where(eq(orderBooking.id, item.orderId))
+    .limit(1);
+
+  const [updatedItem] = await db
+    .update(orderItems)
+    .set({ status })
+    .where(eq(orderItems.id, numericItemId))
     .returning();
 
-  // Let the customer know their booking status changed.
-  if (updated?.customerId) {
+  // If the seller is declining this item and the order was already paid,
+  // refund just this item's share. A customer should never be left having
+  // paid for a service a provider refuses to deliver — the customer-
+  // initiated cancel path (order.service.js#performCancellation) already
+  // does this; a seller-initiated decline is functionally the same outcome
+  // and needs the same treatment.
+  let refundIssued = false;
+  const itemAmount = Number(item.price) * item.quantity;
+  if (
+    status === "cancelled" &&
+    orderRow?.paymentStatus === "paid" &&
+    orderRow?.razorpayPaymentId &&
+    itemAmount > 0
+  ) {
+    try {
+      const amountInPaise = Math.round(itemAmount * 100);
+      await razorpay.payments.refund(orderRow.razorpayPaymentId, {
+        amount: amountInPaise,
+        speed: "normal",
+        notes: { reason: "Item declined by seller", orderItemId: String(numericItemId) },
+      });
+      refundIssued = true;
+    } catch (refundErr) {
+      // Log but don't block the status update — admin can manually refund
+      console.error("Razorpay refund failed (seller decline):", refundErr?.error ?? refundErr);
+    }
+  }
+
+  // Recompute the parent order's rolled-up status from ALL of its items.
+  const siblingItems = await db
+    .select({ status: orderItems.status })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, item.orderId));
+
+  const overallStatus = deriveOverallOrderStatus(siblingItems.map((s) => s.status));
+
+  // paymentStatusEnum has no "partially_refunded" value — only mark the
+  // order "refunded" once the WHOLE order ends up cancelled (every item,
+  // not just this one). The Razorpay refund above still happens for this
+  // item's own amount regardless; paymentStatus just can't represent a
+  // partial state mid-order. Same rule as the customer-initiated cancel
+  // path, kept consistent on purpose.
+  const paymentStatusUpdate =
+    refundIssued && overallStatus === "cancelled" ? { paymentStatus: "refunded" } : {};
+
+  const [updatedOrder] = await db
+    .update(orderBooking)
+    .set({
+      status: overallStatus,
+      ...paymentStatusUpdate,
+      updatedAt: new Date(),
+    })
+    .where(eq(orderBooking.id, item.orderId))
+    .returning();
+
+  // Let the customer know THIS specific item's status changed (not the
+  // aggregate — they should hear "your AC repair booking was declined",
+  // not a vague whole-order message that ignores their other, unaffected
+  // items) — and, for a decline, whether a refund actually went through.
+  if (updatedOrder?.customerId) {
+    const wasPaid = orderRow?.paymentStatus === "paid";
     const statusMessages = {
       accepted: `Your booking for "${item.serviceName}" has been accepted by the seller.`,
       completed: `Your booking for "${item.serviceName}" has been marked as completed.`,
-      cancelled: `Your booking for "${item.serviceName}" has been cancelled by the seller.`,
+      cancelled: refundIssued
+        ? `Your booking for "${item.serviceName}" has been declined by the seller. \u20b9${itemAmount.toFixed(2)} has been refunded and will reflect in your account within 5-7 business days.`
+        : wasPaid
+        ? `Your booking for "${item.serviceName}" has been declined by the seller. We were unable to process your refund automatically — please contact support.`
+        : `Your booking for "${item.serviceName}" has been declined by the seller.`,
     };
 
     await db.insert(notifications).values({
-      customerId: updated.customerId,
-      title: `Booking #${numericBookingId} ${status}`,
+      customerId: updatedOrder.customerId,
+      title: `Booking #${item.orderId} update`,
       message: statusMessages[status] || `Your booking for "${item.serviceName}" status was updated to ${status}.`,
       type: "booking_status",
-      link: `/orders/${numericBookingId}`,
+      link: `/orders/${item.orderId}`,
       isRead: false,
     });
 
-    await redis.incr(`unread:customer:${updated.customerId}`);
+    await redis.incr(`unread:customer:${updatedOrder.customerId}`);
   }
 
-  return updated;
+  return { ...updatedItem, orderOverallStatus: updatedOrder?.status };
 };
 
 const resetPassword = async (token, newPassword) => {

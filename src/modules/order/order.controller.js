@@ -55,4 +55,23 @@ const cancelOrderRequest = async (req, res, next) => {
   }
 };
 
-export { createNewOrder, fetchCustomerOrders, fetchOrderDetails, cancelOrderRequest };
+// Cancels a single line item within a (possibly combined, multi-seller)
+// order, leaving every other item in the same order untouched.
+const cancelOrderItemRequest = async (req, res, next) => {
+  try {
+    const orderId = Number(req.params.id);
+    const itemId = Number(req.params.itemId);
+    if (!Number.isInteger(orderId) || !Number.isInteger(itemId)) {
+      throw ApiError.badRequest("Invalid order or item id");
+    }
+    const customerId = req.user.id;
+
+    const updatedOrder = await orderService.cancelOrderItemService(orderId, itemId, customerId);
+
+    return ApiResponse.success(res, "Item cancelled successfully", updatedOrder);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export { createNewOrder, fetchCustomerOrders, fetchOrderDetails, cancelOrderRequest, cancelOrderItemRequest };

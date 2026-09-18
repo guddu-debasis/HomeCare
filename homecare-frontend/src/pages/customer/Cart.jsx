@@ -58,6 +58,25 @@ export default function Cart() {
     }
   };
 
+  // +/- stepper. Optimistic and non-blocking on purpose — the backend's
+  // /cart/increment endpoint is Redis-only (no DB round trip), specifically
+  // so rapid clicking here doesn't lag. Reaching 0 removes the line, same
+  // as the backend does.
+  const changeQuantity = (item, delta) => {
+    const previousItems = items;
+    const nextQuantity = (item.quantity || 1) + delta;
+    const nextItems =
+      nextQuantity <= 0
+        ? items.filter((i) => i.id !== item.id)
+        : items.map((i) => (i.id === item.id ? { ...i, quantity: nextQuantity } : i));
+
+    setItems(nextItems);
+    cartApi.increment(item.serviceId, item.sellerId, delta).catch((err) => {
+      setItems(previousItems);
+      showError(err.message || "Failed to update quantity.");
+    });
+  };
+
   const subtotal = items.reduce(
     (acc, item) => acc + Number(item.price || item.basePrice || 0) * (item.quantity || 1),
     0
@@ -234,7 +253,30 @@ export default function Cart() {
                         <h3 className="font-display text-lg font-bold text-white">
                           {item.serviceName || `Service #${item.serviceId}`}
                         </h3>
-                        <p className="text-xs text-slate-400">Quantity: {item.quantity || 1}</p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="text-xs text-slate-400">Qty</span>
+                          <div className="flex items-center rounded-lg border border-slate-800 bg-slate-950">
+                            <button
+                              type="button"
+                              onClick={() => changeQuantity(item, -1)}
+                              className="px-2.5 py-1 text-slate-400 hover:text-amber-400 transition-colors"
+                              aria-label="Decrease quantity"
+                            >
+                              −
+                            </button>
+                            <span className="w-6 text-center text-sm font-semibold text-slate-100">
+                              {item.quantity || 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => changeQuantity(item, 1)}
+                              className="px-2.5 py-1 text-slate-400 hover:text-amber-400 transition-colors"
+                              aria-label="Increase quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-800">

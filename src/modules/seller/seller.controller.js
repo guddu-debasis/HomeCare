@@ -76,14 +76,18 @@ const fetchSellerBookings = async (req, res, next) => {
 const updateSellerBookingStatus = async (req, res, next) => {
     try {
         const sellerId = req.user.id;
-        const bookingId = Number(req.params.id);
+        // Despite the route name, :id here is the specific Order_Items row id
+        // (see seller.service.js#updateBookingStatus) — a combined order can
+        // have items from multiple sellers, and this only ever updates this
+        // seller's own line.
+        const orderItemId = Number(req.params.id);
         const { status } = req.body;
 
         if (!status) {
             return res.status(400).json({ success: false, message: "Status is required" });
         }
 
-        const updated = await sellerService.updateBookingStatus(sellerId, bookingId, status);
+        const updated = await sellerService.updateBookingStatus(sellerId, orderItemId, status);
         return ApiResponse.success(res, "Booking status updated successfully", updated);
     } catch (error) {
         next(error);

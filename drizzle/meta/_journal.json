@@ -15,6 +15,13 @@
       "when": 1789486709855,
       "tag": "0001_add_notifications_customer_id",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789600000000,
+      "tag": "0002_add_order_items_status",
+      "breakpoints": true
     }
   ]
 }

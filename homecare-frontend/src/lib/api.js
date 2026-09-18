@@ -199,6 +199,9 @@ export const ordersApi = {
   list: () => client.get("/api/v1/orders"),
   get: (id) => client.get(`/api/v1/orders/${id}`),
   cancel: (id) => client.patch(`/api/v1/orders/${id}/cancel`),
+  // Cancels a single line item within a combined (multi-seller/multi-item)
+  // order, leaving the rest of the order untouched.
+  cancelItem: (orderId, itemId) => client.patch(`/api/v1/orders/${orderId}/items/${itemId}/cancel`),
 };
 
 // ---------- Payments (Razorpay) ----------

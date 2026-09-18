@@ -151,7 +151,7 @@ export default function Orders() {
                     </span>
                   </div>
 
-                  {(order.status || "").toLowerCase() === "pending" && (
+                  {!["completed", "cancelled"].includes((order.status || "").toLowerCase()) && (
                     <div
                       className="flex items-center gap-2"
                       onClick={(e) => {

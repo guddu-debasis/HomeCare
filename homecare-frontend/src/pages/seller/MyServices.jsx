@@ -212,13 +212,17 @@ export default function MyServices() {
   };
 
   // Update Booking Status
-  const handleUpdateBookingStatus = async (bookingId, status) => {
-    setUpdatingBooking(bookingId);
+  // bookingRow.orderItemId is this seller's own Order_Items row — not the
+  // parent order id. A combined order can have items from other sellers,
+  // and this must only ever touch this seller's own line, not the whole
+  // order (see seller.service.js#updateBookingStatus).
+  const handleUpdateBookingStatus = async (bookingRow, status) => {
+    setUpdatingBooking(bookingRow.orderItemId);
     try {
-      await sellerBookingsApi.updateStatus(bookingId, status);
+      await sellerBookingsApi.updateStatus(bookingRow.orderItemId, status);
       showSuccess(`Booking marked as ${status}!`);
       setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, status } : b))
+        prev.map((b) => (b.orderItemId === bookingRow.orderItemId ? { ...b, status } : b))
       );
     } catch (err) {
       showError(err.message || "Failed to update booking status.");
@@ -637,7 +641,7 @@ export default function MyServices() {
 
                   return (
                     <div
-                      key={booking.id}
+                      key={booking.orderItemId}
                       className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col lg:flex-row gap-6 hover:border-slate-700 transition-all"
                     >
                       <div className="flex-1 space-y-4">
@@ -720,15 +724,15 @@ export default function MyServices() {
                         {booking.status === "pending" && (
                           <div className="flex flex-col gap-2 w-full">
                             <button
-                              disabled={updatingBooking === booking.id}
-                              onClick={() => handleUpdateBookingStatus(booking.id, "accepted")}
+                              disabled={updatingBooking === booking.orderItemId}
+                              onClick={() => handleUpdateBookingStatus(booking, "accepted")}
                               className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-xl text-xs transition-colors shadow-md shadow-blue-500/20"
                             >
                               Accept Job
                             </button>
                             <button
-                              disabled={updatingBooking === booking.id}
-                              onClick={() => handleUpdateBookingStatus(booking.id, "cancelled")}
+                              disabled={updatingBooking === booking.orderItemId}
+                              onClick={() => handleUpdateBookingStatus(booking, "cancelled")}
                               className="w-full bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 font-bold py-2 rounded-xl text-xs transition-colors"
                             >
                               Decline
@@ -738,8 +742,8 @@ export default function MyServices() {
 
                         {booking.status === "accepted" && (
                           <button
-                            disabled={updatingBooking === booking.id}
-                            onClick={() => handleUpdateBookingStatus(booking.id, "completed")}
+                            disabled={updatingBooking === booking.orderItemId}
+                            onClick={() => handleUpdateBookingStatus(booking, "completed")}
                             className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-colors shadow-md shadow-emerald-500/20"
                           >
                             Mark Completed

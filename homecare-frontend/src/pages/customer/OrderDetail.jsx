@@ -75,6 +75,8 @@ export default function OrderDetail() {
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancellingItemId, setCancellingItemId] = useState(null);
+  const [confirmCancelItemId, setConfirmCancelItemId] = useState(null);
   const [paying, setPaying] = useState(false);
   const { showSuccess, showError } = useToast();
 
@@ -97,6 +99,32 @@ export default function OrderDetail() {
       showError(err.message || "Failed to cancel booking.");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  // Cancels just one line item within this (possibly combined) order —
+  // everything else in the order is left exactly as it was.
+  const handleCancelItem = async (itemId) => {
+    setCancellingItemId(itemId);
+    try {
+      const res = await ordersApi.cancelItem(id, itemId);
+      showSuccess("That item has been cancelled.");
+      setOrder((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: res.data?.status ?? prev.status,
+          paymentStatus: res.data?.paymentStatus ?? prev.paymentStatus,
+          items: (prev.items || []).map((it) =>
+            it.id === itemId ? { ...it, status: "cancelled" } : it
+          ),
+        };
+      });
+      setConfirmCancelItemId(null);
+    } catch (err) {
+      showError(err.message || "Failed to cancel that item.");
+    } finally {
+      setCancellingItemId(null);
     }
   };
 
@@ -209,7 +237,7 @@ export default function OrderDetail() {
                     {paying ? "Opening payment…" : "Pay now"}
                   </button>
                 )}
-              {(order.status || "").toLowerCase() === "pending" && (
+              {!["completed", "cancelled"].includes((order.status || "").toLowerCase()) && (
                 <button
                   type="button"
                   onClick={() => setShowCancelModal(true)}
@@ -322,7 +350,7 @@ export default function OrderDetail() {
                   <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-semibold text-amber-400">Service #{item.serviceId}</span>
                           <Link
                             to={`/sellers/${item.sellerId}`}
@@ -330,19 +358,63 @@ export default function OrderDetail() {
                           >
                             View Provider #{item.sellerId} Profile →
                           </Link>
+                          {/* Each item has its own status — a combined order can
+                              have several providers, and one declining their
+                              job doesn't affect anyone else's. */}
+                          <StatusBadge status={item.status} />
                         </div>
                         <p className="text-sm font-bold text-slate-200">
                           Quantity: {item.quantity}
                         </p>
                       </div>
 
-                      <span className="text-lg font-extrabold text-amber-400">
-                        {formatMoney(item.price * item.quantity)}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-extrabold text-amber-400">
+                          {formatMoney(item.price * item.quantity)}
+                        </span>
+
+                        {/* Cancel just this one item — for a combined booking
+                            where the customer only wants to back out of one
+                            provider's part, not the whole order. Only shown
+                            while there's actually something to cancel. */}
+                        {["pending", "accepted"].includes((item.status || "").toLowerCase()) && (
+                          confirmCancelItemId === item.id ? (
+                            <div className="flex items-center gap-1.5 rounded-xl border border-red-500/40 bg-red-950/80 px-2.5 py-1">
+                              <span className="text-xs font-semibold text-red-300">Cancel this item?</span>
+                              <button
+                                type="button"
+                                disabled={cancellingItemId === item.id}
+                                onClick={() => handleCancelItem(item.id)}
+                                className="rounded-lg bg-red-600 px-2 py-0.5 text-xs font-bold text-white hover:bg-red-500 disabled:opacity-50"
+                              >
+                                {cancellingItemId === item.id ? "..." : "Yes"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={cancellingItemId === item.id}
+                                onClick={() => setConfirmCancelItemId(null)}
+                                className="rounded-lg bg-slate-800 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-700"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmCancelItemId(item.id)}
+                              className="rounded-lg border border-red-500/30 px-2.5 py-1 text-xs font-semibold text-red-300 hover:bg-red-500/10"
+                            >
+                              Cancel item
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
 
-                    {/* Allow customer rating if completed */}
-                    {order.status === "completed" && (
+                    {/* Allow customer rating once THIS item is completed —
+                        not gated on the whole order, since other items from
+                        other providers may still be in progress. */}
+                    {item.status === "completed" && (
                       <RateSellerInline orderId={order.id} sellerId={item.sellerId} />
                     )}
                   </div>

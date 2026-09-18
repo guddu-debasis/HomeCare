@@ -100,6 +100,11 @@ export const orderItems = pgTable('Order_Items', {
   sellerId: integer('seller_id').notNull().references(() => seller.id, { onDelete: 'restrict' }),
   quantity: integer('quantity').notNull().default(1),
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  // Per-item status. A combined order can contain items from several
+  // sellers, and each seller only controls their own line — orderBooking.status
+  // is a derived rollup of these (see order-status.util.js), never written
+  // to directly by a seller's accept/decline action.
+  status: bookingStatusEnum('status').notNull().default('pending'),
   createdAt: timestamp('createdAt').defaultNow(),
 });
 

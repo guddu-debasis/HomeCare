@@ -1,10 +1,11 @@
 import { db } from "../../common/config/db.js";
 import { orderBooking, orderItems, service, notifications, customers } from "../../db/schema.js";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import ApiError from "../../common/utils/api-error.js";
 import razorpay from "../../common/config/razorpay.js";
 import { redis } from "../../common/config/redis.js";
 import * as cartService from "../cart/cart.service.js";
+import { deriveOverallOrderStatus } from "../../common/utils/order-status.util.js";
 
 const createOrder = async ({ customerId, bookingDate }) => {
   // Joi.date().iso() coerces the incoming string into a JS Date object.
@@ -120,7 +121,10 @@ const getOrderById = async (orderId, customerId) => {
   return { ...order, items };
 };
 
-const cancelOrderService = async (orderId, customerId) => {
+// Shared core for both "cancel the whole order" and "cancel one item within
+// a combined order". onlyItemId narrows which item(s) get cancelled; null
+// means every still-cancellable item (the whole-order case).
+const performCancellation = async ({ orderId, customerId, onlyItemId = null }) => {
   const numericOrderId = Number(orderId);
 
   // 1. Fetch the order and verify ownership
@@ -133,16 +137,65 @@ const cancelOrderService = async (orderId, customerId) => {
     throw ApiError.notFound("Order not found or unauthorized");
   }
 
-  // 2. Check if the order status allows cancellation
-  if (order.status !== "pending") {
+  // 2. Check if the order status still allows cancellation. Blocked only
+  // once there's nothing left to cancel: fully completed, or already
+  // cancelled. Acceptance by a provider does NOT block this — orderBooking
+  // .status is a rollup (see order-status.util.js) that can reach "accepted"
+  // the moment any one seller responds, and a customer should still be able
+  // to cancel a booking (or an item within it) that hasn't been carried out
+  // yet.
+  if (order.status === "completed" || order.status === "cancelled") {
     throw ApiError.badRequest(`Cannot cancel an order that is already ${order.status}`);
   }
 
-  // 3. Issue Razorpay refund if the order was already paid
+  // 3. Figure out which items are actually being cancelled here. Items a
+  // seller already marked "completed" are NOT touched — cancelling can't
+  // retroactively un-complete a job that was actually done.
+  const allItems = await db
+    .select({
+      id: orderItems.id,
+      sellerId: orderItems.sellerId,
+      serviceId: orderItems.serviceId,
+      status: orderItems.status,
+      price: orderItems.price,
+      quantity: orderItems.quantity,
+    })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, numericOrderId));
+
+  let cancellableItems;
+  if (onlyItemId != null) {
+    const target = allItems.find((item) => item.id === Number(onlyItemId));
+    if (!target) {
+      throw ApiError.notFound("Order item not found in this order");
+    }
+    if (target.status === "completed" || target.status === "cancelled") {
+      throw ApiError.badRequest(`Cannot cancel an item that is already ${target.status}`);
+    }
+    cancellableItems = [target];
+  } else {
+    cancellableItems = allItems.filter(
+      (item) => item.status !== "completed" && item.status !== "cancelled"
+    );
+    if (cancellableItems.length === 0) {
+      // Defensive — the order-level guard above should already have caught
+      // the all-completed case.
+      throw ApiError.badRequest("Nothing in this order is eligible for cancellation.");
+    }
+  }
+
+  const cancellableAmount = cancellableItems.reduce(
+    (sum, item) => sum + Number(item.price) * item.quantity,
+    0
+  );
+
+  // 4. Issue a Razorpay refund for the cancelled portion only — never the
+  // full order total, since other items may be untouched (still in
+  // progress) or already completed and legitimately paid for.
   let refundIssued = false;
-  if (order.paymentStatus === "paid" && order.razorpayPaymentId) {
+  if (order.paymentStatus === "paid" && order.razorpayPaymentId && cancellableAmount > 0) {
     try {
-      const amountInPaise = Math.round(Number(order.totalAmount) * 100);
+      const amountInPaise = Math.round(cancellableAmount * 100);
       await razorpay.payments.refund(order.razorpayPaymentId, {
         amount: amountInPaise,
         speed: "normal",  // "normal" = 5-7 business days, "optimum" = instant if eligible
@@ -155,35 +208,58 @@ const cancelOrderService = async (orderId, customerId) => {
     }
   }
 
-  // 4. Update status to cancelled (+ paymentStatus to refunded if refund was issued)
+  // 5. Cancel exactly the targeted item(s), leave everything else untouched.
+  const cancellableIds = cancellableItems.map((item) => item.id);
+  await db
+    .update(orderItems)
+    .set({ status: "cancelled" })
+    .where(and(eq(orderItems.orderId, numericOrderId), inArray(orderItems.id, cancellableIds)));
+
+  // 6. Recompute the parent's rollup status the same way
+  // seller.service.js#updateBookingStatus does, from every item's *current*
+  // status — not hardcoded to "cancelled", since other items untouched by
+  // this cancellation (still pending/accepted, or already completed) mean
+  // the order as a whole isn't simply "cancelled".
+  const finalStatuses = allItems.map((item) =>
+    cancellableIds.includes(item.id) ? "cancelled" : item.status
+  );
+  const overallStatus = deriveOverallOrderStatus(finalStatuses);
+
+  // paymentStatusEnum has no "partially_refunded" value. A full refund only
+  // gets marked "refunded" when the whole order ends up cancelled — a
+  // partial cancel (single item, or one of several) leaves paymentStatus as
+  // "paid", since part of what was paid for is still active or delivered.
+  // The notification below still tells the customer the correct (possibly
+  // partial) amount either way.
+  const paymentStatus =
+    refundIssued && overallStatus === "cancelled" ? "refunded" : order.paymentStatus;
+
   const [updatedOrder] = await db
     .update(orderBooking)
     .set({
-      status: "cancelled",
-      paymentStatus: refundIssued ? "refunded" : order.paymentStatus,
+      status: overallStatus,
+      paymentStatus,
       updatedAt: new Date(),
     })
     .where(eq(orderBooking.id, numericOrderId))
     .returning();
 
-  // 5. Notify sellers + customer about cancellation & refund
+  // 7. Notify sellers whose item was actually cancelled here (not ones
+  // whose item was untouched) + the customer.
   try {
-    const items = await db
-      .select({
-        sellerId: orderItems.sellerId,
-        serviceName: service.serviceName,
-      })
-      .from(orderItems)
-      .leftJoin(service, eq(orderItems.serviceId, service.id))
-      .where(eq(orderItems.orderId, numericOrderId));
+    const cancelledSellerItems = allItems.filter((item) => cancellableIds.includes(item.id));
+    const serviceIds = [...new Set(cancelledSellerItems.map((item) => item.serviceId))];
+    const serviceRows = serviceIds.length
+      ? await db.select({ id: service.id, serviceName: service.serviceName }).from(service).where(inArray(service.id, serviceIds))
+      : [];
+    const serviceNameById = new Map(serviceRows.map((s) => [s.id, s.serviceName]));
 
-    // Notify each seller
-    for (const item of items) {
+    for (const item of cancelledSellerItems) {
       if (item.sellerId) {
         await db.insert(notifications).values({
           sellerId: item.sellerId,
           title: `Booking Cancelled #${numericOrderId}`,
-          message: `Booking for "${item.serviceName || "Service"}" was cancelled by the customer.`,
+          message: `Booking for "${serviceNameById.get(item.serviceId) || "Service"}" was cancelled by the customer.`,
           type: "cancellation",
           link: "/seller/services",
           isRead: false,
@@ -193,9 +269,9 @@ const cancelOrderService = async (orderId, customerId) => {
     }
 
     // Notify customer about refund status
-    if (order.paymentStatus === "paid") {
+    if (order.paymentStatus === "paid" && cancellableAmount > 0) {
       const refundMsg = refundIssued
-        ? `Your payment of ₹${Number(order.totalAmount).toFixed(2)} for Order #${numericOrderId} has been refunded. It will reflect in your account within 5-7 business days.`
+        ? `Your payment of \u20b9${cancellableAmount.toFixed(2)} for the cancelled part of Order #${numericOrderId} has been refunded. It will reflect in your account within 5-7 business days.`
         : `Your Order #${numericOrderId} was cancelled. We were unable to process the refund automatically — please contact support.`;
 
       await db.insert(notifications).values({
@@ -215,4 +291,13 @@ const cancelOrderService = async (orderId, customerId) => {
   return updatedOrder;
 };
 
-export { createOrder, getCustomerOrders, getOrderById, cancelOrderService };
+// Cancel every still-cancellable item in the order.
+const cancelOrderService = (orderId, customerId) =>
+  performCancellation({ orderId, customerId });
+
+// Cancel a single line item within a (possibly combined, multi-seller)
+// order, leaving every other item untouched.
+const cancelOrderItemService = (orderId, itemId, customerId) =>
+  performCancellation({ orderId, customerId, onlyItemId: itemId });
+
+export { createOrder, getCustomerOrders, getOrderById, cancelOrderService, cancelOrderItemService };
