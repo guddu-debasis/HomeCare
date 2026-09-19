@@ -5,6 +5,7 @@ import { ToastProvider } from "./context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ScrollToTop from "./components/ScrollToTop";
 
 // Home is the most common landing page, so it stays in the main bundle —
 // everything else is fetched on demand. A visitor just browsing services
@@ -43,6 +44,7 @@ export default function App() {
       <BrowserRouter>
         <ToastProvider>
           <AuthProvider>
+            <ScrollToTop />
             <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950">
             <Navbar />
             <main className="flex-1">

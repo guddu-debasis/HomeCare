@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { input, btnPrimary } from "../lib/ui";
@@ -24,8 +24,19 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { register } = useAuth();
+  const { register, isAuthenticated, role: currentRole } = useAuth();
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
+
+  // Already signed in? Skip the registration form entirely — send them to
+  // where they'd already land, same as the Login page's guard.
+  useEffect(() => {
+    if (isAuthenticated) {
+      const dest = currentRole === "seller" ? "/seller/services" : currentRole === "admin" ? "/admin/services" : "/";
+      navigate(dest, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const form = forms[role];
   const setField = (key, value) =>

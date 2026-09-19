@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -28,7 +28,7 @@ export default function Login() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
 
-  const { login } = useAuth();
+  const { login, isAuthenticated, role: currentRole } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,6 +38,17 @@ export default function Login() {
     if (r === "admin") return "/admin/services";
     return "/";
   };
+
+  // Already signed in? Don't show a login form for an account they're
+  // already using — send them straight to where they'd land after signing
+  // in, or back to whatever page (if any) sent them here.
+  useEffect(() => {
+    if (isAuthenticated) {
+      const dest = location.state?.from?.pathname || redirectFor(currentRole);
+      navigate(dest, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
