@@ -8,10 +8,10 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-4 space-y-4">
             <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold font-display text-white">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 font-black shadow-md">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-md">
                 H
               </div>
-              <span className="bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 bg-clip-text text-transparent">
+              <span className="text-amber-400">
                 Hearth
               </span>
             </Link>

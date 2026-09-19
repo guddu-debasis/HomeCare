@@ -4,13 +4,13 @@ export const input =
 export const label = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400";
 
 export const btnPrimary =
-  "inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-900/20 transition-all hover:from-amber-500 hover:to-amber-600 hover:shadow-amber-600/30 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-900/20 transition-all hover:bg-amber-400 hover:shadow-amber-600/30 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const btnSecondary =
   "inline-flex items-center justify-center rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-slate-200 transition-all hover:bg-slate-700/60 hover:text-white hover:border-slate-600 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const btnAccent =
-  "inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20 transition-all hover:from-emerald-500 hover:to-emerald-600 hover:shadow-emerald-600/30 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 hover:shadow-emerald-600/30 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const btnGhost = btnSecondary;
 

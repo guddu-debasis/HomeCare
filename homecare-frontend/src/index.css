@@ -236,7 +236,7 @@ html.light .btn-secondary:hover {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #c9592a 0%, #85351a 100%);
+  background: #c9592a;
   color: #ffffff;
   font-weight: 600;
   border-radius: 0.75rem;
@@ -250,7 +250,7 @@ html.light .btn-secondary:hover {
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #de7c48 0%, #c9592a 100%);
+  background: #de7c48;
   transform: translateY(-1px);
   box-shadow: 0 6px 20px 0 rgba(201, 89, 42, 0.45);
 }
@@ -282,7 +282,7 @@ html.light .btn-secondary:hover {
 }
 
 .btn-emerald {
-  background: linear-gradient(135deg, #4f7f55 0%, #315136 100%);
+  background: #4f7f55;
   color: #ffffff;
   font-weight: 600;
   border-radius: 0.75rem;
@@ -292,7 +292,7 @@ html.light .btn-secondary:hover {
 }
 
 .btn-emerald:hover {
-  background: linear-gradient(135deg, #6c9e71 0%, #4f7f55 100%);
+  background: #6c9e71;
   box-shadow: 0 6px 20px 0 rgba(79, 127, 85, 0.45);
 }
 

@@ -76,13 +76,13 @@ export default function Navbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
         {/* Brand Logo */}
         <Link to={role === "seller" ? "/seller/services" : "/"} className="flex items-center gap-3 group" onClick={closeMenu}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 font-black text-slate-950 shadow-lg shadow-amber-600/20 group-hover:scale-105 transition-all">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 font-black text-slate-950 shadow-lg shadow-amber-600/20 group-hover:scale-105 transition-all">
             <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
               <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
             </svg>
           </div>
           <div className="flex flex-col">
-            <span className="font-display text-xl font-bold tracking-tight bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 bg-clip-text text-transparent">
+            <span className="font-display text-xl font-bold tracking-tight text-amber-400">
               Hearth
             </span>
             <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 -mt-1">
@@ -187,7 +187,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   to="/register"
-                  className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-md shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition-all"
+                  className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 transition-all"
                 >
                   Get Started
                 </Link>
