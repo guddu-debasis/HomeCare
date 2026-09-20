@@ -14,6 +14,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { redis } from "../../common/config/redis.js";
 import { deriveOverallOrderStatus } from "../../common/utils/order-status.util.js";
 import razorpay from "../../common/config/razorpay.js";
+import { TIME_SLOTS } from "../../common/constants/time-slots.js";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -166,6 +167,7 @@ const getSellerBookings = async (sellerId) => {
       customerPhone: customers.phNo,
       customerLocation: customers.currLocation,
       bookingDate: orderBooking.bookingDate,
+      timeSlot: orderBooking.timeSlot,
       // This seller's own line status — what this seller can actually see
       // and act on. NOT orderBooking.status, which is a rollup across every
       // seller in the (possibly combined) order and would show this seller
@@ -231,10 +233,29 @@ const updateBookingStatus = async (sellerId, orderItemId, status) => {
       customerId: orderBooking.customerId,
       paymentStatus: orderBooking.paymentStatus,
       razorpayPaymentId: orderBooking.razorpayPaymentId,
+      bookingDate: orderBooking.bookingDate,
+      timeSlot: orderBooking.timeSlot,
     })
     .from(orderBooking)
     .where(eq(orderBooking.id, item.orderId))
     .limit(1);
+
+  // A seller can accept (or decline) a booking any time, but can't mark it
+  // "completed" before the scheduled window has actually started — the job
+  // hasn't happened yet. Orders created before the timeSlot column existed
+  // have no slot on record, so those fall back to just gating on the
+  // booking date itself (midnight UTC) rather than a specific hour.
+  if (status === "completed" && orderRow?.bookingDate) {
+    const slotInfo = orderRow.timeSlot ? TIME_SLOTS[orderRow.timeSlot] : null;
+    const earliestCompletion = new Date(orderRow.bookingDate);
+    earliestCompletion.setUTCHours(slotInfo ? slotInfo.startHour : 0, 0, 0, 0);
+
+    if (new Date() < earliestCompletion) {
+      throw ApiError.badRequest(
+        `This booking can't be marked completed before its scheduled window (${orderRow.bookingDate}${orderRow.timeSlot ? `, ${orderRow.timeSlot}` : ""}).`
+      );
+    }
+  }
 
   const [updatedItem] = await db
     .update(orderItems)

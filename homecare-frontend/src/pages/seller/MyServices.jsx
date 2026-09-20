@@ -28,6 +28,29 @@ const getIcon = (name = "") => {
   return "🔧";
 };
 
+// Must match src/common/constants/time-slots.js on the backend — duplicated
+// here since the frontend and backend are separate projects with no shared
+// module. Used only for the disabled-button UX below; the backend enforces
+// this independently and is the actual source of truth.
+const TIME_SLOT_START_HOURS = {
+  "Morning (08:00 - 12:00)": 8,
+  "Afternoon (12:00 - 16:00)": 12,
+  "Evening (16:00 - 20:00)": 16,
+};
+
+// Whether a booking's scheduled window has actually started yet — gates the
+// "Mark Completed" button client-side so a seller gets an explained,
+// disabled button instead of clicking through to a backend error. Orders
+// placed before timeSlot existed have none on record, so those just check
+// the booking date at midnight UTC.
+const isCompletableNow = (booking) => {
+  if (!booking.bookingDate) return true;
+  const startHour = TIME_SLOT_START_HOURS[booking.timeSlot] ?? 0;
+  const earliest = new Date(booking.bookingDate);
+  earliest.setUTCHours(startHour, 0, 0, 0);
+  return new Date() >= earliest;
+};
+
 export default function MyServices() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -673,6 +696,7 @@ export default function MyServices() {
                                     year: "numeric",
                                   })
                                 : "Date not specified"}
+                              {booking.timeSlot ? ` • ${booking.timeSlot}` : ""}
                             </strong>
                           </span>
                         </div>
@@ -741,13 +765,33 @@ export default function MyServices() {
                         )}
 
                         {booking.status === "accepted" && (
-                          <button
-                            disabled={updatingBooking === booking.orderItemId}
-                            onClick={() => handleUpdateBookingStatus(booking, "completed")}
-                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-colors shadow-md shadow-emerald-500/20"
-                          >
-                            Mark Completed
-                          </button>
+                          isCompletableNow(booking) ? (
+                            <button
+                              disabled={updatingBooking === booking.orderItemId}
+                              onClick={() => handleUpdateBookingStatus(booking, "completed")}
+                              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-colors shadow-md shadow-emerald-500/20"
+                            >
+                              Mark Completed
+                            </button>
+                          ) : (
+                            <div className="w-full text-center space-y-1">
+                              <button
+                                disabled
+                                title="This booking's scheduled window hasn't started yet"
+                                className="w-full bg-slate-800 text-slate-500 font-bold py-2.5 rounded-xl text-xs cursor-not-allowed"
+                              >
+                                Not Yet Due
+                              </button>
+                              <p className="text-[10px] text-slate-500">
+                                Available from{" "}
+                                {new Date(booking.bookingDate).toLocaleDateString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                                {booking.timeSlot ? `, ${booking.timeSlot}` : ""}
+                              </p>
+                            </div>
+                          )
                         )}
 
                         {booking.status === "completed" && (

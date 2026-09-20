@@ -17,6 +17,15 @@ export default function Cart() {
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
+  // Bookings can only be scheduled within the next 7 days — today through
+  // today+7 — enforced here via the date input's min/max, and again
+  // server-side in order.service.js#createOrder since a native date input's
+  // min/max is only a UI hint and can be bypassed (devtools, direct API call).
+  const todayStr = new Date().toISOString().split("T")[0];
+  const maxBookingDate = new Date();
+  maxBookingDate.setDate(maxBookingDate.getDate() + 7);
+  const maxBookingDateStr = maxBookingDate.toISOString().split("T")[0];
+
   const loadCart = () => {
     setLoading(true);
     cartApi
@@ -99,8 +108,8 @@ export default function Cart() {
 
     setOrdering(true);
     try {
-      // Backend expects { bookingDate }
-      const res = await ordersApi.create(bookingDate);
+      // Backend expects { bookingDate, timeSlot }
+      const res = await ordersApi.create({ bookingDate, timeSlot });
       const bookingId = res.data.id;
 
       let rpRes;
@@ -328,10 +337,15 @@ export default function Cart() {
                     <input
                       type="date"
                       required
+                      min={todayStr}
+                      max={maxBookingDateStr}
                       value={bookingDate}
                       onChange={(e) => setBookingDate(e.target.value)}
                       className={input}
                     />
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Bookings can be scheduled up to 7 days in advance.
+                    </p>
                   </div>
 
                   <div>

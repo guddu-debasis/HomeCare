@@ -195,7 +195,7 @@ export const cartApi = {
 
 // ---------- Orders ----------
 export const ordersApi = {
-  create: (bookingDate) => client.post("/api/v1/orders", { bookingDate }),
+  create: ({ bookingDate, timeSlot }) => client.post("/api/v1/orders", { bookingDate, timeSlot }),
   list: () => client.get("/api/v1/orders"),
   get: (id) => client.get(`/api/v1/orders/${id}`),
   cancel: (id) => client.patch(`/api/v1/orders/${id}/cancel`),

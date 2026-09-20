@@ -22,6 +22,13 @@
       "when": 1789600000000,
       "tag": "0002_add_order_items_status",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789886092856,
+      "tag": "0003_panoramic_slipstream",
+      "breakpoints": true
     }
   ]
 }

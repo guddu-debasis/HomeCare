@@ -1,0 +1,1 @@
+ALTER TABLE "Order/Booking" ADD COLUMN "time_slot" varchar(50);

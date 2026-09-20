@@ -7,7 +7,7 @@ import { redis } from "../../common/config/redis.js";
 import * as cartService from "../cart/cart.service.js";
 import { deriveOverallOrderStatus } from "../../common/utils/order-status.util.js";
 
-const createOrder = async ({ customerId, bookingDate }) => {
+const createOrder = async ({ customerId, bookingDate, timeSlot }) => {
   // Joi.date().iso() coerces the incoming string into a JS Date object.
   // Normalize it back to a plain YYYY-MM-DD string so DB inserts and
   // notification messages don't show a full timezone-aware datetime string.
@@ -51,6 +51,7 @@ const createOrder = async ({ customerId, bookingDate }) => {
         paymentStatus: "pending",
         status: "pending",
         bookingDate: bookingDateStr,
+        timeSlot,
       })
       .returning();
 
@@ -74,7 +75,7 @@ const createOrder = async ({ customerId, bookingDate }) => {
       await tx.insert(notifications).values({
         sellerId: item.sellerId,
         title: `New Booking Order #${booking.id}`,
-        message: `New booking for "${item.serviceName}" (Qty: ${item.quantity}) from ${cust?.username || "Customer"} scheduled on ${bookingDateStr}.`,
+        message: `New booking for "${item.serviceName}" (Qty: ${item.quantity}) from ${cust?.username || "Customer"} scheduled on ${bookingDateStr}${timeSlot ? `, ${timeSlot}` : ""}.`,
         type: "order",
         link: "/seller/services",
         isRead: false,

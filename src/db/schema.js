@@ -3,6 +3,7 @@ import { pgTable, serial, bigint, varchar, decimal, timestamp, date, integer, pg
 // Enums
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'paid', 'failed', 'refunded']);
 export const bookingStatusEnum = pgEnum('booking_status', ['pending', 'accepted', 'completed', 'cancelled']);
+export const verificationStatusEnum = pgEnum('verification_status', ['pending', 'approved', 'rejected']);
 
 // Customers Table
 export const customers = pgTable('Customers', {
@@ -65,6 +66,13 @@ export const sellerService = pgTable('Seller_Service', {
   serviceId: integer('service_id').notNull().references(() => service.id, { onDelete: 'cascade' }),
   customPrice: decimal('custom_price', { precision: 10, scale: 2 }),
   description: varchar('description', { length: 1000 }),
+  // A listing stays invisible to customers until an admin approves it —
+  // see seller-service.service.js. Restored here after accidentally being
+  // dropped from this file (it was still live in the actual database with
+  // real data; never run `drizzle-kit push` without reading what it says
+  // it's about to do first).
+  verificationStatus: verificationStatusEnum('verification_status').notNull().default('pending'),
+  rejectionReason: varchar('rejection_reason', { length: 500 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -86,6 +94,11 @@ export const orderBooking = pgTable('Order/Booking', {
   paymentStatus: paymentStatusEnum('payment_status').notNull().default('pending'),
   status: bookingStatusEnum('status').notNull().default('pending'),
   bookingDate: date('booking_date').notNull(),
+  // Nullable for backward compatibility with rows created before this
+  // column existed. New orders always set it (see create-order.dto.js),
+  // and it's what gates a seller from marking a job "completed" before the
+  // scheduled window actually arrives (see seller.service.js#updateBookingStatus).
+  timeSlot: varchar('time_slot', { length: 50 }),
   razorpayOrderId: varchar('razorpay_order_id', { length: 255 }),
   razorpayPaymentId: varchar('razorpay_payment_id', { length: 255 }),
   createdAt: timestamp('createdAt').defaultNow(),
