@@ -265,4 +265,9 @@ export const customerNotificationsApi = {
   markAllRead: () => client.patch("/app/v1/customer/notifications/read-all"),
 };
 
+// ---------- AI Search ----------
+export const aiSearchApi = {
+  search: (query) => client.post("/api/v1/ai-search", { query }),
+};
+
 export default client;

@@ -7,6 +7,7 @@ import { formatMoney } from "../lib/format";
 import { btnPrimary, btnSecondary } from "../lib/ui";
 import Modal from "../components/Modal";
 import Footer from "../components/Footer";
+import AiSearchPanel from "../components/AiSearchPanel";
 
 // ---------------------------------------------------------------------
 // A small custom icon set instead of raw emoji. Emoji render differently
@@ -523,6 +524,11 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* 1.5. AI SEARCH — distinct from the plain keyword filter above:
+          natural-language query, ranked by an LLM over real approved
+          listings only, never a substitute for browsing the catalog. */}
+      <AiSearchPanel />
 
       {/* 2. CATEGORY FILTER BAR */}
       <section id="services-catalog" className="sticky top-[65px] z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur-lg py-4">

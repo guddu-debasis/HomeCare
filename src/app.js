@@ -12,6 +12,7 @@ import sellerServiceRoutes from "./modules/seller-service/seller-service.routes.
 import ratingsRoutes from "./modules/ratings/ratings.routes.js";
 import errorHandler from "./common/middlewares/error.middleware.js";
 import paymentRoutes from "./modules/payment/payment.routes.js";
+import aiSearchRoutes from "./modules/ai-search/ai-search.routes.js";
 
 const app = express()
 
@@ -47,6 +48,7 @@ app.use("/api/v1/services", serviceRoutes);
 app.use("/api/v1/seller-services", sellerServiceRoutes);
 app.use("/api/v1/ratings", ratingsRoutes);
 app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/v1/ai-search", aiSearchRoutes);
 
 import { resetPassword as customerReset } from "./modules/customer/customer.service.js";
 import { resetPassword as sellerReset } from "./modules/seller/seller.service.js";

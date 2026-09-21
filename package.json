@@ -17,6 +17,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@langchain/core": "^0.3.40",
+    "@langchain/groq": "^0.2.2",
     "@neondatabase/serverless": "^1.1.0",
     "@upstash/redis": "^1.38.4",
     "bcrypt": "^6.0.0",
@@ -30,7 +32,8 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.23.0",
-    "razorpay": "^2.9.8"
+    "razorpay": "^2.9.8",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
