@@ -6,21 +6,13 @@ import { groqModel } from "../../common/config/groq.js";
 import { redis } from "../../common/config/redis.js";
 import ApiError from "../../common/utils/api-error.js";
 
-// Per-customer rate limit — the free Groq tier is rate-limited per model
-// across ALL of your customers combined, so this also protects other
-// customers' searches from one person hammering the endpoint, not just
-// your own API budget. Same INCR + first-write EXPIRE pattern already used
-// for unread-notification counters.
+
 const RATE_LIMIT = 20;
 const RATE_WINDOW_SECONDS = 60 * 60; // 1 hour
 
 const MAX_RESULTS = 5;
 
-// The model is only ever allowed to return this shape — forced via
-// withStructuredOutput below, not parsed from free text. It can pick which
-// candidates to return and write a short reason, and nothing else: it
-// cannot invent a sellerServiceId, a price, or a name, because none of
-// that lives in the schema it's allowed to produce.
+
 const rankingSchema = z.object({
   results: z
     .array(
@@ -53,12 +45,6 @@ const enforceRateLimit = async (customerId) => {
   }
 };
 
-// Deterministic retrieval — runs BEFORE the model is ever called, and the
-// model has no ability to influence or expand this query. Approved
-// listings only: an AI recommendation carries an implicit "we picked this
-// for you" endorsement, so a rejected or still-pending listing must never
-// reach it, same rule as every other customer-facing read in
-// seller-service.service.js.
 const getCandidates = async () => {
   const [listings, ratingStats] = await Promise.all([
     db
@@ -111,9 +97,7 @@ const searchServices = async ({ customerId, query }) => {
     return { results: [], message: "No approved listings are available to search yet." };
   }
 
-  // Compact view for the prompt — only what the model needs to judge
-  // relevance/price/rating, nothing it doesn't (no internal DB ids beyond
-  // the one it needs to reference back, no seller contact info, etc).
+
   const candidateSummaries = candidates.map((c) => ({
     sellerServiceId: c.sellerServiceId,
     service: c.serviceName,
@@ -148,11 +132,7 @@ const searchServices = async ({ customerId, query }) => {
     throw ApiError.badRequest("AI search is temporarily unavailable — try browsing the catalog instead.");
   }
 
-  // Reconciliation — the step that actually makes this safe. Every id the
-  // model returned is looked up again against the REAL candidate list built
-  // above; anything that doesn't match a real row is silently dropped, and
-  // every field in the response except `reason` comes from Postgres, never
-  // from whatever the model echoed back.
+
   const candidateById = new Map(candidates.map((c) => [c.sellerServiceId, c]));
 
   const results = (structured.results || [])

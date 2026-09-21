@@ -4,7 +4,8 @@ A full-stack home-services booking platform. Customers browse a service
 catalog, book a specific seller/provider, pay online via Razorpay, and
 track/cancel/rate their bookings. Sellers manage their own service listings
 and respond to bookings. Admins manage the master catalog and review
-seller listings before they go live.
+seller listings before they go live. An AI search feature ranks real,
+approved listings against a customer's natural-language request.
 
 ---
 
@@ -18,6 +19,7 @@ seller listings before they go live.
   - [DTOs & Joi validation](#dtos--joi-validation)
   - [Drizzle ORM + PostgreSQL](#drizzle-orm--postgresql)
   - [Redis (Upstash)](#redis-upstash)
+  - [AI search (Groq)](#ai-search-groq)
   - [Auth](#auth)
   - [Error handling](#error-handling)
 - [Frontend (UI)](#frontend-ui)
@@ -37,7 +39,8 @@ seller listings before they go live.
 | **Database** | PostgreSQL (via `pg` / Neon serverless driver) |
 | **ORM** | Drizzle ORM + Drizzle Kit |
 | **Validation** | Joi, via a small `BaseDto` wrapper |
-| **Cache / ephemeral state** | Upstash Redis (REST client) — live shopping cart, unread notification counters |
+| **Cache / ephemeral state** | Upstash Redis (REST client) — live shopping cart, unread notification counters, AI search rate limiting |
+| **AI** | Groq (`@langchain/groq` + `@langchain/core`), structured-output ranking over real DB candidates — not a free-roaming agent |
 | **Auth** | JWT (access + refresh), Google OAuth (Passport.js) |
 | **Payments** | Razorpay (checkout + server-side verification + webhook) |
 | **Email** | Nodemailer |
@@ -58,13 +61,15 @@ seller listings before they go live.
       ▼
  routes/*.routes.js  →  validate(Dto) middleware  →  controller  →  service  →  Drizzle  →  PostgreSQL
                                                               │
-                                                              └─→  Redis (cart, unread counts)
+                                                              └─→  Redis (cart, unread counts, AI search rate limit)
                                                               └─→  Razorpay API (payments)
+                                                              └─→  Groq API (AI search ranking)
                                                               └─→  Nodemailer (password reset emails)
 ```
 
 Every module (`admin`, `seller`, `customer`, `cart`, `order`, `service`,
-`seller-service`, `ratings`, `payment`) follows the same four-file shape:
+`seller-service`, `ratings`, `payment`, `ai-search`) follows the same
+four-file shape:
 
 ```
 modules/<name>/
@@ -87,7 +92,8 @@ HomeCare/
 │   ├── app.js                     Express app: CORS, body parsing, route mounting, error handler
 │   ├── common/
 │   │   ├── config/                db.js (Postgres pool), redis.js (Upstash client),
-│   │   │                          razorpay.js, passport.js (Google OAuth strategies)
+│   │   │                          razorpay.js, groq.js (ChatGroq client),
+│   │   │                          passport.js (Google OAuth strategies)
 │   │   ├── dto/                   BaseDto — the Joi validation wrapper every DTO extends
 │   │   ├── middlewares/           auth.middleware.js, validate.middleware.js, error.middleware.js
 │   │   └── utils/                 ApiError, ApiResponse, jwt.utils.js, email.utils.js, order-status.util.js
@@ -99,12 +105,13 @@ HomeCare/
 │       ├── payment/                          Razorpay order creation, verification, webhook
 │       ├── service/                          master service catalog (admin/seller managed)
 │       ├── seller-service/                   a seller's own listing against a catalog service
-│       └── ratings/                           customer → seller reviews
+│       ├── ratings/                          customer → seller reviews
+│       └── ai-search/                        natural-language search, ranked over real approved listings (see below)
 └── homecare-frontend/
     └── src/
         ├── lib/                    api.js (every backend call), format.js, ui.js (shared Tailwind classes)
         ├── context/                 AuthContext, ToastContext, ThemeContext
-        ├── components/              Navbar, NotificationBell, Modal, Footer, PageLoader, ...
+        ├── components/              Navbar, NotificationBell, Modal, Footer, PageLoader, AiSearchPanel, ...
         └── pages/
             ├── Home, Login, Register, SellerProfile, ResetPassword, OAuthCallback, NotFound
             ├── customer/             Cart, Orders, OrderDetail
@@ -196,7 +203,7 @@ with Drizzle's query builder (`db.select()...`, `db.insert()...`, etc.).
 |---|---|
 | `Customers` / `Seller` / `Admin` | The three account types — separate tables, not a shared `users` table with a role column |
 | `Service` | The master catalog — a name and base price, managed by admins/sellers |
-| `Seller_Service` | A specific seller's listing against a catalog `Service` — their own price/description. Has `verificationStatus` (`pending`/`approved`/`rejected`) + `rejectionReason` for admin moderation |
+| `Seller_Service` | A specific seller's listing against a catalog `Service` — their own price/description. Has `verificationStatus` (`pending`/`approved`/`rejected`) + `rejectionReason` for admin moderation. This is also the table AI search reads candidates from — see below |
 | `Cart_Items` | **Unused as of the Redis cart rewrite** — kept in the schema for now, nothing reads/writes it (see [Redis](#redis-upstash)) |
 | `Order/Booking` | A checkout — `status` here is a **rollup** derived from its items, not written directly (see below) |
 | `Order_Items` | One line per (service, seller) in a booking. Each has its **own** `status` — a combined booking can have several sellers, and one accepting/declining their line never affects anyone else's |
@@ -233,7 +240,7 @@ to do before confirming; it has no way to know whether a mismatch means
 
 ### Redis (Upstash)
 
-Two independent uses, both via the same REST client (`src/common/config/redis.js`):
+Three independent uses, all via the same REST client (`src/common/config/redis.js`):
 
 - **Live cart** (`cart.service.js`) — a customer's cart is a Redis hash
   (`cart:customer:{id}`), one field per `serviceId:sellerId` line, value =
@@ -250,6 +257,47 @@ Two independent uses, both via the same REST client (`src/common/config/redis.js
   incremented whenever a notification is inserted and reset on
   mark-as-read, so the navbar badge doesn't require scanning the full
   notification list on every page load.
+- **AI search rate limiting** (`ai-search.service.js`) — `ai-search:{customerId}`,
+  20 requests/hour, same `INCR` + first-write `EXPIRE` pattern as the
+  counters above. Exists because Groq's free tier is rate-limited per
+  model across *all* your customers combined, not per-customer — this
+  protects the shared budget, not just cost.
+
+### AI search (Groq)
+
+`src/modules/ai-search/` — a customer describes what they need in plain
+language ("cost-optimized deep cleaning with a high rating") and gets back
+a ranked shortlist of real listings they can add straight to their cart.
+
+This is deliberately **retrieval-then-rank, not an autonomous agent**. The
+model never decides what to look up or takes any action beyond producing a
+ranked list — every step is fixed:
+
+1. **Deterministic retrieval** (`getCandidates` in `ai-search.service.js`) —
+   runs unconditionally, before the model is ever called. Fetches every
+   `Seller_Service` row where `verificationStatus = 'approved'` (a rejected
+   or still-pending listing must never reach an AI recommendation — that
+   carries an implicit "we picked this for you" endorsement a review-gated
+   listing hasn't earned), joined with `Service` for name/price and a
+   per-seller average from `Ratings`.
+2. **Forced structured output** — the candidate list and the customer's
+   query are sent to Groq via LangChain's `withStructuredOutput()`, bound
+   to a Zod schema (`{ results: [{ sellerServiceId, reason }] }`). The
+   model cannot return free text or invent fields outside that shape.
+3. **Reconciliation** — every `sellerServiceId` the model returns is looked
+   up again against the real candidate list built in step 1. Anything that
+   doesn't match a real row is silently dropped. Every field in the final
+   response except `reason` — price, name, rating — comes from Postgres,
+   never from whatever the model echoed back. This is what makes the
+   feature safe against both hallucination and prompt injection via the
+   customer's own query text: the worst a crafted query can do is
+   influence *which* real candidates get picked and what the reason text
+   says, never fabricate a result or take an action.
+
+Model is configured once in `src/common/config/groq.js`
+(`openai/gpt-oss-120b`, `temperature: 0` — this only ever ranks a fixed
+list against forced output, never generates free creative text, so
+there's no reason to want variation between identical calls).
 
 ### Auth
 
@@ -278,15 +326,23 @@ error page.
   so the initial bundle only ships the code for whichever page was actually
   requested.
 - **`lib/api.js`** — every single backend call lives here, grouped by
-  resource (`cartApi`, `ordersApi`, `sellerServicesApi`, `adminApi`, ...).
-  Pages never call `axios`/`fetch` directly. A response interceptor unwraps
-  the backend's `{ success, message, data }` envelope, so page code just
-  reads `res.data`.
+  resource (`cartApi`, `ordersApi`, `sellerServicesApi`, `adminApi`,
+  `aiSearchApi`, ...). Pages never call `axios`/`fetch` directly. A
+  response interceptor unwraps the backend's `{ success, message, data }`
+  envelope, so page code just reads `res.data`.
 - **Contexts** — `AuthContext` (current user/role/token, login/logout),
   `ToastContext` (`showSuccess`/`showError`, used everywhere instead of
   inline error text), `ThemeContext`.
 - **`ProtectedRoute`** — wraps role-gated routes, redirects to `/login` if
   unauthenticated or to `/` if the role doesn't match.
+- **`AiSearchPanel`** (rendered on `Home.jsx`, below the hero) — the
+  natural-language search UI. Deliberately visually distinct from the
+  plain keyword filter already on the same page, so the two search
+  mechanisms don't get confused for one another. Every result it renders
+  comes straight from the backend's reconciled response (see
+  [AI search](#ai-search-groq)) — the component itself never has to treat
+  model output as trusted data, because it's structurally impossible for
+  any to reach it.
 - **Design** — dark theme, Tailwind utility classes directly (no component
   library), a small set of shared class strings in `lib/ui.js`
   (`btnPrimary`, `btnSecondary`, `input`, ...) rather than a full design
@@ -306,6 +362,7 @@ error page.
 - A running PostgreSQL instance
 - An [Upstash Redis](https://console.upstash.com) database (free tier is enough)
 - A [Razorpay](https://razorpay.com) account (test-mode keys are enough for development)
+- A [Groq](https://console.groq.com/keys) API key (free tier), for AI search
 - (Optional) A Google OAuth client, if you want "Sign in with Google"
 
 ### 1. Backend
@@ -346,6 +403,7 @@ npm run dev            # starts Vite on :5173
 | `RAZORPAY_WEBHOOK_SECRET` | Razorpay Dashboard → Settings → Webhooks (see payment flow below) |
 | `ADMIN_SETUP_SECRET` | Required as an `x-setup-secret` header to hit `POST /app/v1/admin/register` — otherwise anyone could create an admin account |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google Cloud Console OAuth client, for "Sign in with Google" |
+| `GROQ_API_KEY` | [console.groq.com/keys](https://console.groq.com/keys) — powers AI search (`src/modules/ai-search/`) |
 
 ### Frontend (`homecare-frontend/.env`)
 
@@ -394,6 +452,7 @@ not a typo.
 | Seller-Services (a seller's own listings) | `/api/v1/seller-services` | `GET /`, `GET /service/:serviceId`, `GET /seller/:sellerId` public; `POST /`, `PATCH|PUT /:serviceId`, `DELETE /:serviceId` seller-only |
 | Ratings | `/api/v1/ratings` | public `GET /seller/:sellerId`; customer-only `POST /` |
 | Payments | `/api/v1/payments` | see payment flow below |
+| AI Search | `/api/v1/ai-search` | `POST /` — customer-only, `{ query }` → ranked, real listings (see [AI search](#ai-search-groq)) |
 
 ### Payment flow
 
@@ -431,9 +490,14 @@ net for "customer paid but the connection dropped before step 3."
   (list-pending, approve/reject) don't currently exist in
   `admin.controller.js`/`admin.routes.js`. Practically: **any seller
   listing is visible to customers right now, including ones that were
-  previously rejected.** This was a working, tested feature earlier and
-  appears to have been reverted along with an unrelated schema change —
-  worth restoring deliberately rather than leaving as-is.
+  previously rejected** — except through AI search, whose own retrieval
+  query filters to `verificationStatus = 'approved'` independently (see
+  [AI search](#ai-search-groq)), so that one path is still correctly
+  gated. This was a working, tested feature earlier and appears to have
+  been reverted along with an unrelated schema change — worth restoring
+  deliberately rather than leaving as-is, and worth doing before it's
+  confusing that AI search and the main catalog grid don't agree on what's
+  visible.
 - There's no endpoint to browse/search sellers by service from scratch —
   only `GET /api/v1/seller-services/seller/:sellerId`, which requires
   already knowing a seller's ID.
@@ -442,3 +506,7 @@ net for "customer paid but the connection dropped before step 3."
   Razorpay Dashboard.
 - `Cart_Items` (Postgres table) is fully superseded by the Redis cart and
   unused in code — safe to drop in a future migration, kept for now.
+- AI search's free-tier Groq rate limit (20 requests/customer/hour,
+  `ai-search.service.js`) is a starting guess, not tuned against real
+  traffic — revisit if it's too strict or too loose once there's usage
+  data.
