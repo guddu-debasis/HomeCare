@@ -61,8 +61,7 @@ const getCandidates = async () => {
       })
       .from(sellerService)
       .innerJoin(service, eq(sellerService.serviceId, service.id))
-      .innerJoin(seller, eq(sellerService.sellerId, seller.id))
-      .where(eq(sellerService.verificationStatus, "approved")),
+      .innerJoin(seller, eq(sellerService.sellerId, seller.id)),
     db
       .select({
         sellerId: ratings.sellerId,
@@ -94,7 +93,7 @@ const searchServices = async ({ customerId, query }) => {
   const candidates = await getCandidates();
 
   if (candidates.length === 0) {
-    return { results: [], message: "No approved listings are available to search yet." };
+    return { results: [], message: "No listings are available to search yet." };
   }
 
 
