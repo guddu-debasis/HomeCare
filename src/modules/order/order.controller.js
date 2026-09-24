@@ -74,4 +74,36 @@ const cancelOrderItemRequest = async (req, res, next) => {
   }
 };
 
-export { createNewOrder, fetchCustomerOrders, fetchOrderDetails, cancelOrderRequest, cancelOrderItemRequest };
+// Not a normal ApiResponse JSON envelope on success — either the raw PDF
+// bytes (invoice ready) or a small JSON status object (still generating).
+// The frontend checks Content-Type to tell the two apart.
+const fetchOrderInvoice = async (req, res, next) => {
+  try {
+    const orderId = Number(req.params.id);
+    if (!Number.isInteger(orderId)) {
+      throw ApiError.badRequest("Invalid order id");
+    }
+    const customerId = req.user.id;
+
+    const invoice = await orderService.getOrderInvoice(orderId, customerId);
+
+    if (!invoice.ready) {
+      return ApiResponse.success(res, "Invoice is still being generated", { status: "pending" });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="invoice-order-${orderId}.pdf"`);
+    return res.send(invoice.buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export {
+  createNewOrder,
+  fetchCustomerOrders,
+  fetchOrderDetails,
+  cancelOrderRequest,
+  cancelOrderItemRequest,
+  fetchOrderInvoice,
+};

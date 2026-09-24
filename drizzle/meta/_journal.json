@@ -29,6 +29,13 @@
       "when": 1789886092856,
       "tag": "0003_panoramic_slipstream",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790231664068,
+      "tag": "0004_perpetual_logan",
+      "breakpoints": true
     }
   ]
 }

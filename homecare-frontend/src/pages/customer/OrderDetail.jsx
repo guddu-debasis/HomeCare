@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ordersApi, ratingsApi, paymentsApi, waitForPaymentStatus } from "../../lib/api";
+import { ordersApi, ratingsApi, paymentsApi, waitForPaymentStatus, downloadInvoice } from "../../lib/api";
 import { formatMoney, formatDate } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
 import { btnPrimary, btnSecondary, btnDanger, input } from "../../lib/ui";
@@ -78,6 +78,7 @@ export default function OrderDetail() {
   const [cancellingItemId, setCancellingItemId] = useState(null);
   const [confirmCancelItemId, setConfirmCancelItemId] = useState(null);
   const [paying, setPaying] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
@@ -204,6 +205,12 @@ export default function OrderDetail() {
     }
   };
 
+  const handleDownloadInvoice = async () => {
+    setDownloadingInvoice(true);
+    await downloadInvoice(order.id, { showError });
+    setDownloadingInvoice(false);
+  };
+
   const getStepIndex = (status) => {
     const s = (status || "pending").toLowerCase();
     if (s === "pending") return 1;
@@ -226,6 +233,16 @@ export default function OrderDetail() {
           </div>
           {order && (
             <div className="flex items-center gap-3">
+              {order.paymentStatus === "paid" && (
+                <button
+                  type="button"
+                  onClick={handleDownloadInvoice}
+                  disabled={downloadingInvoice}
+                  className={`${btnSecondary} px-4 py-1.5 text-sm`}
+                >
+                  {downloadingInvoice ? "Preparing…" : "🧾 Download Invoice"}
+                </button>
+              )}
               {(order.paymentStatus === "pending" || order.paymentStatus === "failed") &&
                 (order.status || "").toLowerCase() !== "cancelled" && (
                   <button

@@ -4,6 +4,7 @@ import { db } from "../../common/config/db.js";
 import { orderBooking } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import ApiError from "../../common/utils/api-error.js";
+import { enqueueInvoiceGeneration } from "./invoice-queue.util.js";
 
 const createRazorpayOrder = async (orderId, customerId) => {
   const [order] = await db
@@ -111,6 +112,10 @@ const verifyPayment = async (
     .where(eq(orderBooking.id, order.id))
     .returning();
 
+  // Fire-and-forget — see invoice-queue.util.js for why this can't fail
+  // the payment response.
+  enqueueInvoiceGeneration(updated.id);
+
   return updated;
 };
 
@@ -185,6 +190,13 @@ const processWebhookEvent = async (rawBody, signature) => {
       .update(orderBooking)
       .set({ paymentStatus: "paid", razorpayPaymentId, updatedAt: new Date() })
       .where(eq(orderBooking.id, order.id));
+
+    // Same reasoning as the /verify path above — this is the OTHER place a
+    // payment can be confirmed (the webhook fallback), so it needs the same
+    // trigger. Forgetting it here would mean payments confirmed only via
+    // webhook (e.g. the customer's browser tab closed before /verify ran)
+    // silently never get an invoice.
+    enqueueInvoiceGeneration(order.id);
   } else if (eventType === "payment.failed") {
     await db
       .update(orderBooking)

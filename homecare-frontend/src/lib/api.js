@@ -202,7 +202,54 @@ export const ordersApi = {
   // Cancels a single line item within a combined (multi-seller/multi-item)
   // order, leaving the rest of the order untouched.
   cancelItem: (orderId, itemId) => client.patch(`/api/v1/orders/${orderId}/items/${itemId}/cancel`),
+  // The invoice PDF is generated asynchronously by a background worker after
+  // payment (see backend src/workers/invoice-worker.js) — this can return
+  // either the actual PDF bytes or a small { status: "pending" } JSON object
+  // if the worker hasn't gotten to it yet, so it's fetched as a blob and the
+  // caller checks blob.type to tell the two apart (see downloadInvoice below).
+  getInvoice: (id) => client.get(`/api/v1/orders/${id}/invoice`, { responseType: "blob" }),
 };
+
+// Shared by Orders.jsx and OrderDetail.jsx. Triggers a real file download
+// when the invoice is ready, or surfaces a friendly "still generating"
+// message (via the passed-in toast function) when it isn't yet.
+export async function downloadInvoice(orderId, { showError }) {
+  try {
+    const blob = await ordersApi.getInvoice(orderId); // already unwrapped to the Blob by the response interceptor
+    if (blob.type && blob.type.includes("application/pdf")) {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-order-${orderId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      return true;
+    }
+
+    // The backend sent its normal JSON envelope instead of a PDF (still
+    // generating, or an error) — it arrives as a Blob here only because the
+    // request was made with responseType: "blob" to also support the PDF case.
+    const text = await blob.text();
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      // ignore — fall through to the generic message below
+    }
+
+    if (parsed?.data?.status === "pending") {
+      showError("Your invoice is still being generated. Please check back in a moment.");
+    } else {
+      showError(parsed?.message || "Could not download the invoice.");
+    }
+    return false;
+  } catch (err) {
+    showError(err.message || "Could not download the invoice.");
+    return false;
+  }
+}
 
 // ---------- Payments (Razorpay) ----------
 export const paymentsApi = {

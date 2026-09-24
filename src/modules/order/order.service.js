@@ -6,6 +6,7 @@ import razorpay from "../../common/config/razorpay.js";
 import { redis } from "../../common/config/redis.js";
 import * as cartService from "../cart/cart.service.js";
 import { deriveOverallOrderStatus } from "../../common/utils/order-status.util.js";
+import { generateAndSaveInvoice } from "./invoice.service.js";
 
 const createOrder = async ({ customerId, bookingDate, timeSlot }) => {
   // Joi.date().iso() coerces the incoming string into a JS Date object.
@@ -301,4 +302,44 @@ const cancelOrderService = (orderId, customerId) =>
 const cancelOrderItemService = (orderId, itemId, customerId) =>
   performCancellation({ orderId, customerId, onlyItemId: itemId });
 
-export { createOrder, getCustomerOrders, getOrderById, cancelOrderService, cancelOrderItemService };
+// The PDF itself is generated asynchronously by src/workers/invoice-worker.js
+// after payment (see payment.service.js, which only enqueues an SQS message).
+// This returns one of three shapes the controller turns into the right HTTP
+// response: not found/unauthorized (throws), not paid yet (throws), still
+// generating (ready: false — NOT an error, the worker just hasn't gotten to
+// it yet), or the actual PDF bytes.
+const getOrderInvoice = async (orderId, customerId) => {
+  const [order] = await db
+    .select()
+    .from(orderBooking)
+    .where(and(eq(orderBooking.id, Number(orderId)), eq(orderBooking.customerId, customerId)))
+    .limit(1);
+
+  if (!order) {
+    throw ApiError.notFound("Order not found");
+  }
+
+  if (order.paymentStatus !== "paid") {
+    throw ApiError.badRequest("An invoice is only available for a paid order.");
+  }
+
+  if (!order.invoicePdfBase64) {
+    // If background worker hasn't generated it yet or SQS is offline, generate on-demand
+    const buffer = await generateAndSaveInvoice(order.id);
+    if (buffer) {
+      return { ready: true, buffer };
+    }
+    return { ready: false };
+  }
+
+  return { ready: true, buffer: Buffer.from(order.invoicePdfBase64, "base64") };
+};
+
+export {
+  createOrder,
+  getCustomerOrders,
+  getOrderById,
+  cancelOrderService,
+  cancelOrderItemService,
+  getOrderInvoice,
+};

@@ -1,4 +1,4 @@
-import { pgTable, serial, bigint, varchar, decimal, timestamp, date, integer, pgEnum, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, serial, bigint, varchar, decimal, timestamp, date, integer, pgEnum, boolean, text } from 'drizzle-orm/pg-core';
 
 // Enums
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'paid', 'failed', 'refunded']);
@@ -101,6 +101,13 @@ export const orderBooking = pgTable('Order/Booking', {
   timeSlot: varchar('time_slot', { length: 50 }),
   razorpayOrderId: varchar('razorpay_order_id', { length: 255 }),
   razorpayPaymentId: varchar('razorpay_payment_id', { length: 255 }),
+  // Generated asynchronously by src/workers/invoice-worker.js after a
+  // successful payment (see payment.service.js, which enqueues the SQS
+  // message but never generates the PDF itself). Both null until the
+  // worker actually processes the message — GET /api/v1/orders/:id/invoice
+  // treats that as "still generating", not an error.
+  invoicePdfBase64: text('invoice_pdf_base64'),
+  invoiceGeneratedAt: timestamp('invoice_generated_at'),
   createdAt: timestamp('createdAt').defaultNow(),
   updatedAt: timestamp('updatedAt').defaultNow(),
 });

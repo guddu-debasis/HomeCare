@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "worker:invoice": "node src/workers/invoice-worker.js",
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate"
   },
@@ -17,6 +18,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.716.0",
     "@langchain/core": "^0.3.40",
     "@langchain/groq": "^0.2.2",
     "@neondatabase/serverless": "^1.1.0",
@@ -31,6 +33,7 @@
     "nodemailer": "^10.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "pdfkit": "^0.15.1",
     "pg": "^8.23.0",
     "razorpay": "^2.9.8",
     "zod": "^3.24.1"

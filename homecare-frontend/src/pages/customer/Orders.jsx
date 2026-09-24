@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ordersApi } from "../../lib/api";
+import { ordersApi, downloadInvoice } from "../../lib/api";
 import { formatMoney, formatDate } from "../../lib/format";
 import { btnSecondary, btnDanger } from "../../lib/ui";
 import { useToast } from "../../context/ToastContext";
@@ -14,6 +14,7 @@ export default function Orders() {
   const [filter, setFilter] = useState("all");
   const [cancellingId, setCancellingId] = useState(null);
   const [confirmCancelId, setConfirmCancelId] = useState(null);
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState(null);
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
@@ -40,6 +41,14 @@ export default function Orders() {
     } finally {
       setCancellingId(null);
     }
+  };
+
+  const handleDownloadInvoice = async (e, orderId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDownloadingInvoiceId(orderId);
+    await downloadInvoice(orderId, { showError });
+    setDownloadingInvoiceId(null);
   };
 
   const filteredOrders = orders.filter((o) => {
@@ -150,6 +159,17 @@ export default function Orders() {
                       {formatMoney(order.totalAmount)}
                     </span>
                   </div>
+
+                  {order.paymentStatus === "paid" && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDownloadInvoice(e, order.id)}
+                      disabled={downloadingInvoiceId === order.id}
+                      className="rounded-xl border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {downloadingInvoiceId === order.id ? "Preparing…" : "🧾 Invoice"}
+                    </button>
+                  )}
 
                   {!["completed", "cancelled"].includes((order.status || "").toLowerCase()) && (
                     <div
