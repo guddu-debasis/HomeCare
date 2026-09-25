@@ -144,20 +144,20 @@ sequenceDiagram
     participant Redis as Upstash Redis
     participant DB as PostgreSQL (Drizzle)
 
-    Customer->>Frontend: Clicks "Add to Cart"
-    Frontend->>API: POST /app/v1/cart { serviceId, sellerId, quantity }
-    API->>Redis: HINCRBY cart:customer:{id} "{serviceId}:{sellerId}" {quantity}
-    API->>Redis: EXPIRE cart:customer:{id} 2592000 (30 Days TTL)
-    API-->>Frontend: 200 OK (Item Count / Cart Updated)
+    Customer->>Frontend: Clicks Add to Cart
+    Frontend->>API: POST /app/v1/cart (serviceId, sellerId, quantity)
+    API->>Redis: HINCRBY cart:customer:id serviceId:sellerId quantity
+    API->>Redis: EXPIRE cart:customer:id (30 Days TTL)
+    API-->>Frontend: 200 OK (Cart Updated)
 
     Customer->>Frontend: Proceed to Checkout
-    Frontend->>API: POST /api/v1/orders { bookingDate, timeSlot }
-    API->>Redis: HGETALL cart:customer:{id}
+    Frontend->>API: POST /api/v1/orders (bookingDate, timeSlot)
+    API->>Redis: HGETALL cart:customer:id
     API->>DB: Batch Fetch Service details & Seller prices
-    API->>DB: BEGIN Transaction: INSERT INTO "Order/Booking" & "Order_Items"
+    API->>DB: BEGIN Transaction: INSERT INTO Order_Booking & Order_Items
     DB-->>API: Transaction Committed (orderId)
-    API->>Redis: DEL cart:customer:{id} (Purge Cart)
-    API-->>Frontend: 201 Created { orderId, totalAmount, status: "pending" }
+    API->>Redis: DEL cart:customer:id (Purge Cart)
+    API-->>Frontend: 201 Created (orderId, totalAmount, status: pending)
 ```
 
 ---
@@ -177,31 +177,31 @@ sequenceDiagram
 
     Customer->>Client: Pay Now
     Client->>API: POST /api/v1/payments/orders/:id/create
-    API->>Razorpay: orders.create({ amount, currency: "INR" })
+    API->>Razorpay: orders.create(amount, currency: INR)
     Razorpay-->>API: razorpayOrderId
     API->>DB: Update order with razorpayOrderId
-    API-->>Client: { razorpayOrderId, amount, keyId }
+    API-->>Client: Return razorpayOrderId, amount, keyId
 
     Client->>Razorpay: Opens Razorpay Checkout Modal
-    Razorpay-->>Client: Returns { paymentId, signature }
+    Razorpay-->>Client: Returns paymentId, signature
     Client->>API: POST /api/v1/payments/verify
     API->>API: Constant-time timingSafeEqual HMAC validation
 
     alt Valid Signature
-        API->>DB: UPDATE "Order/Booking" SET paymentStatus = 'paid'
-        API->>SQS: SendMessageCommand({ orderId })
+        API->>DB: UPDATE Order_Booking SET paymentStatus = paid
+        API->>SQS: SendMessageCommand(orderId)
         Note over API: Returns immediately! PDF is NOT generated inline.
-        API-->>Client: 200 OK { paymentStatus: "paid" }
-    else SQS Unavailable / Offline
+        API-->>Client: 200 OK (paymentStatus: paid)
+    else SQS Unavailable or Offline
         API->>API: Graceful Fallback: Generate inline via Promise
     end
 
     loop Worker Long Polling
         Worker->>SQS: ReceiveMessageCommand (WaitTimeSeconds: 20)
-        SQS-->>Worker: Deliver { orderId }
+        SQS-->>Worker: Deliver orderId
         Worker->>DB: Fetch Order, Customer & Item lines
         Worker->>Worker: Render PDF in-memory (PDFKit)
-        Worker->>DB: UPDATE "Order/Booking" SET invoicePdfBase64, invoiceGeneratedAt
+        Worker->>DB: UPDATE Order_Booking SET invoicePdfBase64, invoiceGeneratedAt
         Worker->>SQS: DeleteMessageCommand (ReceiptHandle)
     end
 ```
@@ -214,16 +214,16 @@ Hearth uses a strict **Retrieval-Augmented Ranking** architecture. The AI engine
 
 ```mermaid
 flowchart TD
-    A[Customer Query: 'Emergency sink leakage repair'] --> B[Express Controller]
-    B --> C[(PostgreSQL DB)]
-    C -- Step 1: Deterministic Retrieval --> D[Fetch All Approved Seller_Service Offerings + Ratings]
-    D --> E[Candidate Serialization: id, title, price, rating, bio]
-    E --> F[Groq ChatGroq: openai/gpt-oss-120b]
+    A["Customer Query: Emergency sink leakage repair"] --> B["Express Controller"]
+    B --> C[("PostgreSQL DB")]
+    C -->|"Step 1: Deterministic Retrieval"| D["Fetch All Approved Seller_Service Offerings & Ratings"]
+    D --> E["Candidate Serialization: id, title, price, rating, bio"]
+    E --> F["Groq ChatGroq: openai/gpt-oss-120b"]
     A --> F
-    F -- Step 2: LangChain withStructuredOutput --> G[Structured JSON Schema: Array of { sellerServiceId, reason }]
-    G --> H[Step 3: Database Reconciliation Engine]
-    H -- Discard any ID not in original Candidate list --> I[Clean Verified Matches]
-    I -- Hydrate authoritative pricing & metadata from DB --> J[Return Enriched Results to Customer]
+    F -->|"Step 2: LangChain withStructuredOutput"| G["Structured JSON Schema: Array of (sellerServiceId, reason)"]
+    G --> H["Step 3: Database Reconciliation Engine"]
+    H -->|"Discard any ID not in candidate list"| I["Clean Verified Matches"]
+    I -->|"Hydrate authoritative pricing & metadata from DB"| J["Return Enriched Results to Customer"]
 ```
 
 ---
@@ -334,7 +334,7 @@ Hearth maintains **strict separation of identity** by assigning Customers, Selle
 
 ```mermaid
 erDiagram
-    Customers ||--o{ "Order/Booking" : places
+    Customers ||--o{ Order_Booking : places
     Customers ||--o{ Ratings : writes
     Customers ||--o{ Notifications : receives
     Customers ||--o{ Cart_Items : legacy
@@ -347,8 +347,8 @@ erDiagram
     Service ||--o{ Seller_Service : categorizes
     Service ||--o{ Order_Items : defines
 
-    "Order/Booking" ||--|{ Order_Items : contains
-    "Order/Booking" ||--o{ Ratings : evaluated_in
+    Order_Booking ||--|{ Order_Items : contains
+    Order_Booking ||--o{ Ratings : evaluated_in
 
     Customers {
         serial id PK
@@ -393,16 +393,16 @@ erDiagram
         int serviceId FK
         decimal customPrice
         varchar description
-        enum verificationStatus
+        varchar verificationStatus
         varchar rejectionReason
     }
 
-    "Order/Booking" {
+    Order_Booking {
         serial id PK
         int customerId FK
         decimal totalAmount
-        enum paymentStatus
-        enum status
+        varchar paymentStatus
+        varchar status
         date bookingDate
         varchar timeSlot
         varchar razorpayOrderId
@@ -418,7 +418,7 @@ erDiagram
         int sellerId FK
         int quantity
         decimal price
-        enum status
+        varchar status
     }
 
     Ratings {
