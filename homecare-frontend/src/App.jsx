@@ -27,13 +27,12 @@ const OrderDetail = lazy(() => import("./pages/customer/OrderDetail"));
 const MyServices = lazy(() => import("./pages/seller/MyServices"));
 const ManageServices = lazy(() => import("./pages/admin/ManageServices"));
 
-// Small, deliberately boring fallback — shown only for the brief moment a
-// lazy chunk is downloading (typically well under what a spinner needs to
-// justify itself once the chunk is cached by the browser).
+import HomeCareSpinner from "./components/HomeCareSpinner";
+
 function RouteLoadingFallback() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+      <HomeCareSpinner size="lg" label="Loading..." />
     </div>
   );
 }

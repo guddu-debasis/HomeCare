@@ -8,6 +8,7 @@ import { btnPrimary, btnSecondary, input } from "../lib/ui";
 import Stars from "../components/Stars";
 import Modal from "../components/Modal";
 import Footer from "../components/Footer";
+import HomeCareSpinner from "../components/HomeCareSpinner";
 
 export default function SellerProfile() {
   const { sellerId } = useParams();
@@ -229,9 +230,8 @@ export default function SellerProfile() {
         {/* Content Section */}
         <div className="mx-auto max-w-6xl px-6 py-12 space-y-12">
           {loading && (
-            <div className="space-y-4">
-              <div className="h-32 rounded-2xl bg-slate-900/60 animate-pulse" />
-              <div className="h-32 rounded-2xl bg-slate-900/60 animate-pulse" />
+            <div className="py-20 flex flex-col items-center justify-center">
+              <HomeCareSpinner size="lg" label="Loading provider profile & reviews..." />
             </div>
           )}
 

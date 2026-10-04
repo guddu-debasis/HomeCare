@@ -6,6 +6,7 @@ import { btnSecondary, btnDanger } from "../../lib/ui";
 import { useToast } from "../../context/ToastContext";
 import StatusBadge from "../../components/StatusBadge";
 import Footer from "../../components/Footer";
+import HomeCareSpinner from "../../components/HomeCareSpinner";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -97,9 +98,8 @@ export default function Orders() {
         </div>
 
         {loading && (
-          <div className="space-y-4">
-            <div className="h-28 rounded-2xl bg-slate-900/60 animate-pulse" />
-            <div className="h-28 rounded-2xl bg-slate-900/60 animate-pulse" />
+          <div className="py-20 flex flex-col items-center justify-center">
+            <HomeCareSpinner size="lg" label="Loading your HomeCare bookings..." />
           </div>
         )}
 

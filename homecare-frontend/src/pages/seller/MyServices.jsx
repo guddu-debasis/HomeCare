@@ -7,26 +7,8 @@ import { formatMoney } from "../../lib/format";
 import { btnPrimary, btnSecondary, input } from "../../lib/ui";
 import Modal from "../../components/Modal";
 import Footer from "../../components/Footer";
-
-const SERVICE_ICONS = {
-  plumb: "🚰",
-  clean: "🧹",
-  electr: "⚡",
-  paint: "🎨",
-  carpent: "🪚",
-  pest: "🐜",
-  appliance: "🧺",
-  ac: "❄️",
-  repair: "🛠️",
-};
-
-const getIcon = (name = "") => {
-  const lower = name.toLowerCase();
-  for (const [key, icon] of Object.entries(SERVICE_ICONS)) {
-    if (lower.includes(key)) return icon;
-  }
-  return "🔧";
-};
+import HomeCareSpinner from "../../components/HomeCareSpinner";
+import { TradeIcon, getServiceIconType } from "../../components/TradeIcon";
 
 // Must match src/common/constants/time-slots.js on the backend — duplicated
 // here since the frontend and backend are separate projects with no shared
@@ -273,8 +255,9 @@ export default function MyServices() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button onClick={copyProfileLink} className={btnSecondary}>
-              🔗 Share Profile Link
+            <button onClick={copyProfileLink} className={`${btnSecondary} flex items-center gap-1.5`}>
+              <TradeIcon type="link" className="w-4 h-4" />
+              Share Profile Link
             </button>
             <button onClick={() => setIsCreateModalOpen(true)} className={btnPrimary}>
               + Create Custom Service
@@ -285,8 +268,8 @@ export default function MyServices() {
         {/* Dashboard Banner Stats Widget */}
         <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 p-6 backdrop-blur-xl grid grid-cols-1 sm:grid-cols-4 gap-6 shadow-xl">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-xl">
-              🆔
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <TradeIcon type="id" className="w-6 h-6" />
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
@@ -305,8 +288,8 @@ export default function MyServices() {
           </div>
 
           <div className="flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-slate-800 pt-4 sm:pt-0 sm:pl-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xl">
-              📦
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <TradeIcon type="box" className="w-6 h-6" />
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
@@ -319,8 +302,8 @@ export default function MyServices() {
           </div>
 
           <div className="flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-slate-800 pt-4 sm:pt-0 sm:pl-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-xl">
-              📅
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+              <TradeIcon type="calendar" className="w-6 h-6" />
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
@@ -340,8 +323,8 @@ export default function MyServices() {
           </div>
 
           <div className="flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-slate-800 pt-4 sm:pt-0 sm:pl-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold text-xl">
-              📚
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+              <TradeIcon type="book" className="w-6 h-6" />
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
@@ -364,7 +347,10 @@ export default function MyServices() {
                 : "text-slate-400 hover:text-white hover:bg-slate-900"
             }`}
           >
-            <span>🛠️ My Services & Catalog</span>
+            <span className="flex items-center gap-1.5">
+              <TradeIcon type="toolbox" className="w-4 h-4" />
+              My Services & Catalog
+            </span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs ${
                 activeTab === "services"
@@ -384,7 +370,10 @@ export default function MyServices() {
                 : "text-slate-400 hover:text-white hover:bg-slate-900"
             }`}
           >
-            <span>📋 Incoming Client Bookings</span>
+            <span className="flex items-center gap-1.5">
+              <TradeIcon type="clipboard" className="w-4 h-4" />
+              Incoming Client Bookings
+            </span>
             {pendingBookingsCount > 0 ? (
               <span className="rounded-full bg-red-500 text-white text-xs px-2 py-0.5 font-black animate-pulse">
                 {pendingBookingsCount} New
@@ -405,9 +394,8 @@ export default function MyServices() {
 
         {/* Loading / Error States */}
         {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="h-44 rounded-2xl bg-slate-900/60 border border-slate-800 animate-pulse" />
-            <div className="h-44 rounded-2xl bg-slate-900/60 border border-slate-800 animate-pulse" />
+          <div className="py-20 flex flex-col items-center justify-center">
+            <HomeCareSpinner size="lg" label="Loading your service offerings & bookings..." />
           </div>
         )}
 
@@ -438,7 +426,9 @@ export default function MyServices() {
 
               {offerings.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-amber-500/30 bg-amber-500/5 p-8 text-center space-y-3">
-                  <div className="text-4xl">⚡</div>
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-400">
+                    <TradeIcon type="box" className="w-6 h-6" />
+                  </div>
                   <h3 className="font-display text-lg font-bold text-white">
                     You Have No Active Offerings Listed
                   </h3>
@@ -455,7 +445,9 @@ export default function MyServices() {
                     >
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-2xl">{getIcon(offering.serviceName)}</span>
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-800/90 border border-slate-700/80 text-amber-400">
+                            <TradeIcon type={getServiceIconType(offering.serviceName)} className="w-5 h-5" />
+                          </div>
                           <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
                             Active Offering
                           </span>
@@ -532,7 +524,9 @@ export default function MyServices() {
 
               {availableToAdd.length === 0 ? (
                 <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-10 text-center space-y-3">
-                  <div className="text-4xl">🎉</div>
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
+                    <TradeIcon type="sparkle" className="w-6 h-6" />
+                  </div>
                   <h3 className="font-display text-lg font-bold text-emerald-400">
                     You Offer All Catalog Services!
                   </h3>
@@ -549,7 +543,9 @@ export default function MyServices() {
                     >
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-2xl">{getIcon(srv.serviceName)}</span>
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-800/90 border border-slate-700/80 text-amber-400">
+                            <TradeIcon type={getServiceIconType(srv.serviceName)} className="w-5 h-5" />
+                          </div>
                           <span className="text-[11px] font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded-md">
                             Base: {formatMoney(srv.basePrice)}
                           </span>
@@ -608,10 +604,10 @@ export default function MyServices() {
                     onChange={(e) => setBookingDateSort(e.target.value)}
                     className="bg-transparent text-amber-400 font-semibold outline-none cursor-pointer"
                   >
-                    <option value="scheduled-desc" className="bg-slate-900 text-white">📅 Scheduled Date (Newest First)</option>
-                    <option value="scheduled-asc" className="bg-slate-900 text-white">📅 Scheduled Date (Earliest First)</option>
-                    <option value="created-desc" className="bg-slate-900 text-white">⏱️ Booking Placed (Most Recent)</option>
-                    <option value="created-asc" className="bg-slate-900 text-white">⏱️ Booking Placed (Oldest)</option>
+                    <option value="scheduled-desc" className="bg-slate-900 text-white">Scheduled Date (Newest First)</option>
+                    <option value="scheduled-asc" className="bg-slate-900 text-white">Scheduled Date (Earliest First)</option>
+                    <option value="created-desc" className="bg-slate-900 text-white">Booking Placed (Most Recent)</option>
+                    <option value="created-asc" className="bg-slate-900 text-white">Booking Placed (Oldest)</option>
                   </select>
                 </div>
 
@@ -638,7 +634,9 @@ export default function MyServices() {
 
             {bookings.length === 0 ? (
               <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-16 text-center space-y-4 max-w-xl mx-auto">
-                <div className="text-5xl">📅</div>
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-slate-400">
+                  <TradeIcon type="calendar" className="w-7 h-7" />
+                </div>
                 <h3 className="font-display text-xl font-bold text-white">No Bookings Yet</h3>
                 <p className="text-slate-400 text-sm">
                   When homeowners select your provider profile and place an order, their booking details will appear right here.

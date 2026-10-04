@@ -7,6 +7,7 @@ import { btnPrimary, btnSecondary, btnDanger, input } from "../../lib/ui";
 import StatusBadge from "../../components/StatusBadge";
 import Stars from "../../components/Stars";
 import Footer from "../../components/Footer";
+import HomeCareSpinner from "../../components/HomeCareSpinner";
 
 function RateSellerInline({ orderId, sellerId }) {
   const [score, setScore] = useState(5);
@@ -145,7 +146,7 @@ export default function OrderDetail() {
         key: keyId,
         amount,
         currency,
-        name: "Hearth",
+        name: "HomeCare",
         description: `Booking #${order.id}`,
         order_id: razorpayOrderId,
         theme: { color: "#f59e0b" },
@@ -269,9 +270,8 @@ export default function OrderDetail() {
         </div>
 
         {loading && (
-          <div className="space-y-4">
-            <div className="h-32 rounded-2xl bg-slate-900/60 animate-pulse" />
-            <div className="h-64 rounded-2xl bg-slate-900/60 animate-pulse" />
+          <div className="py-20 flex flex-col items-center justify-center">
+            <HomeCareSpinner size="lg" label="Loading booking details..." />
           </div>
         )}
 

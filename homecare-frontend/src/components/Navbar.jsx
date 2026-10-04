@@ -82,11 +82,11 @@ export default function Navbar() {
             </svg>
           </div>
           <div className="flex flex-col">
-            <span className="font-display text-xl font-bold tracking-tight text-amber-400">
-              Hearth
+            <span className="font-display text-xl font-extrabold tracking-tight text-white flex items-center">
+              Home<span className="text-amber-400">Care</span>
             </span>
-            <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 -mt-1">
-              HomeCare
+            <span className="text-[9px] uppercase font-bold tracking-widest text-slate-400 -mt-1">
+              Verified Doorstep Services
             </span>
           </div>
         </Link>

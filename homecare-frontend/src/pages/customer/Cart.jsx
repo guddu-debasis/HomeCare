@@ -6,6 +6,7 @@ import { formatMoney } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
 import { btnPrimary, btnSecondary, input } from "../../lib/ui";
 import Footer from "../../components/Footer";
+import HomeCareSpinner from "../../components/HomeCareSpinner";
 
 export default function Cart() {
   const [items, setItems] = useState([]);
@@ -137,7 +138,7 @@ export default function Cart() {
         key: keyId,
         amount,
         currency,
-        name: "Hearth",
+        name: "HomeCare",
         description: `Booking #${bookingId}`,
         order_id: razorpayOrderId,
         theme: { color: "#f59e0b" },
@@ -215,9 +216,8 @@ export default function Cart() {
         </div>
 
         {loading && (
-          <div className="space-y-4">
-            <div className="h-24 rounded-2xl bg-slate-900/60 animate-pulse" />
-            <div className="h-24 rounded-2xl bg-slate-900/60 animate-pulse" />
+          <div className="py-20 flex flex-col items-center justify-center">
+            <HomeCareSpinner size="lg" label="Loading your booking cart..." />
           </div>
         )}
 
@@ -390,7 +390,7 @@ export default function Cart() {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Hearth Booking Protection Included
+                    HomeCare Booking Protection Included
                   </div>
                   <p className="text-[11px] text-emerald-400/80">
                     Free cancellations up to 24h before scheduled arrival. 100% money-back guarantee.
@@ -400,9 +400,16 @@ export default function Cart() {
                 <button
                   onClick={handleCheckout}
                   disabled={ordering}
-                  className={`${btnPrimary} w-full py-3 text-base`}
+                  className={`${btnPrimary} w-full py-3 text-base flex items-center justify-center gap-2`}
                 >
-                  {ordering ? "Starting payment..." : "Confirm & Pay →"}
+                  {ordering ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Starting Payment...
+                    </>
+                  ) : (
+                    "Confirm & Pay →"
+                  )}
                 </button>
               </div>
             </div>
